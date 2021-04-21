@@ -1,0 +1,235 @@
+{% extends "layout.html"%}
+
+{%block content%}
+<script>
+    let games
+    let loggedIn
+
+    function logout() {
+        window.localStorage.removeItem("RPAtoken")
+        window.location.replace("/")
+    }
+
+
+    const token = window.localStorage.getItem("RPAtoken")
+    //console.log("token from local storage:" + token)
+
+    const user = $.ajax({
+        url: "/me",
+        type: "GET",
+        beforeSend: function (xhr) {
+            xhr.setRequestHeader('Authorization', "Bearer " + token);
+        },
+        success: function () {
+            console.log(user.responseJSON)
+            const username = user.responseJSON["username"]
+            loggedIn = true
+            document.getElementById('label-logout').innerHTML = "<i class=\"icon user\"></i>" + username
+
+            getMyRecentMessages()
+
+        },
+        error: function () {
+            logout()
+        }
+    });
+
+    const allgamesGET = $.ajax({
+        url: "/games",
+        type: "GET",
+        success: function () {
+            games = allgamesGET.responseJSON
+            var games_list = document.getElementById("list-games");
+            for (var i = 0; i < games.length; i++) {
+                const x = games[i]
+                var btnHTML = '<div class="item"><button class="ui disabled button" onclick="create(\'' + x + '\')">' + x + '</button></div>'
+                // if not logged in - disable!
+                games_list.innerHTML += btnHTML
+            }
+
+        }
+    });
+
+    function getMyRecentMessages() {
+        const mymessagesGET = $.ajax({
+            url: "/myrecentmessages",
+            type: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                var msg_list = document.getElementById("list-messages")
+                messages = mymessagesGET.responseJSON
+                let max = messages.length - 5;
+                if (max < 0)
+                    max = 0
+                for (var i = messages.length - 1; i >= max; i--) {
+                    current = messages[i]
+                    prettyDate = dateConvert(current["date"])
+                    //TODO reply knopf mal mindestens
+                    var msgHTML = '<div class="comment"><a class="avatar">\n' +
+                        '                        <img src="avatar/' + current["sender_avatar"] + '">\n' +
+                        '                    </a><div class="content">\n' +
+                        '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
+                        '                            <span class="date">' + prettyDate + '</span>\n' +
+                        '                        </div><div class="text">' + current["content"] + '</div><div class="actions" onclick="reply(\'' + current["sender"] + '\')">\n' +
+                        '                            <a class="reply">Reply</a>\n' +
+                        '                        </div></div>'
+                    msg_list.innerHTML += msgHTML
+
+                }
+            }
+
+        });
+    }
+
+    function reply(name) {
+        document.getElementById("field-recipient").classList.remove('error')
+        document.getElementById("input-recipient").value = name
+        document.getElementById("input-message").value = ""
+        $('#modal-newmessage').modal('show')
+        $("#input-message").focus();
+    }
+
+    function dateConvert(datetime) {
+        //TODO wie machen echte leute das?
+        //console.log(datetime)
+        let prettyDate = ""
+        for (let i = 11; i < 16; i++)
+            prettyDate += datetime[i]
+        prettyDate += " on "
+        prettyDate += datetime[5]
+        prettyDate += datetime[6]
+        prettyDate += "/"
+        prettyDate += datetime[8]
+        prettyDate += datetime[9]
+        prettyDate += "/"
+        prettyDate += datetime[2]
+        prettyDate += datetime[3]
+        prettyDate += "."
+        return prettyDate
+    }
+
+    //TODO
+    function create(game) {
+        console.log("create ", game)
+    }
+
+    function send() {
+        const recipient = document.getElementById("input-recipient").value
+        const content = document.getElementById("input-message").value
+
+        const send = $.ajax({
+            url: "/send/",
+            type: "POST",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({"recipient": recipient, "content": content}),
+            dataType: 'json',
+            success: function () {
+                console.log("sent successfully")
+                document.getElementById("field-recipient").classList.remove('error')
+                document.getElementById("input-recipient").value = ""
+                document.getElementById("input-message").value = ""
+                $('#modal-newmessage').modal('hide').modal('hide dimmer');
+            },
+            error: function () {
+                // TODO hier koennte irgendwas anderes schiefgehen?
+                //  generelle fehlermeldung ala oops smth went wrong
+                console.log(send.responseJSON)
+                document.getElementById("field-recipient").classList.add('error')
+                //document.getElementById("input-recipient").setAttribute("data-content", "popup")
+            }
+        });
+    }
+
+    // function buildCreateButton(gameName) {
+    //     //console.log(gameName)
+    //     var btnHTML = String('<div class="item"><button class="ui button" onclick="create(\'')
+    //     btnHTML += gameName
+    //     //console.log(btnHTML)
+    //     btnHTML += String('\')">')
+    //     btnHTML += gameName
+    //     btnHTML += String('</button></div>')
+    //     //console.log(btnHTML)
+    // }
+
+
+</script>
+
+<h2>Dashboard</h2>
+<hr>
+<div class="ui grid">
+    <div class="left floated four wide column">
+        <h3 class="ui dividing header">create game</h3>
+        <div class="ui list" id="list-games">
+        </div>
+
+    </div>
+
+    <div class="four wide column">
+        <h3 class="ui dividing header">open challenges</h3>
+    </div>
+
+    <div class="four wide column">
+        <h3 class="ui dividing header">your current games</h3>
+    </div>
+
+    <div class="right floated four wide column">
+        <div class="ui comments">
+            <h3 class="ui dividing header">Recent private messages</h3>
+            <div id="list-messages">
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+
+<div class="ui grid">
+    <div class="left floated four wide column">
+        <button class="ui icon button">
+            <i class="hand rock outline icon"></i><br>
+        </button>
+        <button class="ui icon button">
+            <i class="hand paper outline icon"></i><br>
+        </button>
+        <button class="ui icon button">
+            <i class="hand scissors icon outline"></i>
+        </button>
+    </div>
+    <div class="right floated four wide column">
+        <button class="ui labeled icon button" onclick="$('#modal-newmessage').modal('show');">
+            <i class="paper plane outline icon"></i>
+            new message
+        </button>
+    </div>
+
+</div>
+
+<div id="modal-newmessage" class="ui small modal">
+    <i class="close icon"></i>
+    <div class="header">Compose message</div>
+    <div class="content">
+        <form class="ui form">
+            <div class="field" id="field-recipient">
+                <input type="text" id="input-recipient" placeholder="Recipient">
+            </div>
+            <div class="field">
+                <textarea rows="4" placeholder="Your message" id="input-message"></textarea>
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <button class="ui labeled icon button" onclick="send()">
+            <i class="paper plane outline icon"></i>
+            send
+        </button>
+    </div>
+</div>
+
+
+{% endblock %}

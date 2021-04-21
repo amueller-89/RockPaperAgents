@@ -1,0 +1,293 @@
+{% extends "layout logged out.html"%}
+
+{%block content%}
+
+
+<div id="name-div" class="ui labeled input">
+    <div class="ui label">
+        name
+    </div>
+    <input id="name" type="text" autocomplete="off">
+</div>
+
+<div id="password-div" class="ui labeled input">
+    <div class="ui label">
+        password
+    </div>
+    <input id="password" type="password" autocomplete="off">
+</div>
+
+<div class="ui button primary" id="btn login" onclick="login(false)"> login</div>
+<div class="ui button secondary" onclick="login(true)">register</div>
+<br><br>
+<div class="ui huge label" id="reg-success-label" style="display: none">
+    Registration successful!
+</div>
+
+<div id="modal-namenotfound" class="ui mini modal">
+    <div class="header">Login failed</div>
+    <div class="content">
+        Username not registered
+    </div>
+    <div class="actions">
+        <div class="ui black deny button">
+            ok
+        </div>
+    </div>
+</div>
+
+<div id="modal-invalidpw" class="ui mini modal">
+    <div class="header">Login failed</div>
+    <div class="content">
+        Invalid password
+    </div>
+    <div class="actions">
+        <div class="ui black deny button">
+            ok
+        </div>
+    </div>
+</div>
+
+<div id="modal-nametaken" class="ui mini modal">
+    <div class="header">Account creation failed</div>
+    <div class="content">
+        Username already taken
+    </div>
+    <div class="actions">
+        <div class="ui black deny button">
+            ok
+        </div>
+    </div>
+</div>
+
+<div id="modal-register" class="ui tiny modal">
+    <i class="close icon"></i>
+    <div class="header">Provide an email address and confirm your password</div>
+    <div class="content">
+        <form class="ui form">
+            <div class="field" id="field-email">
+                <input type="text" id="input-email" placeholder="email">
+            </div>
+            <div class="field" id="field-password2">
+                <input type="password" id="input-password2" placeholder="password">
+            </div>
+            <div class="field" id="field-tc">
+                <div class="ui checkbox" id="div-tc">
+                    <input type="checkbox" tabindex="0" id="input-tc">
+                    <label id="text-tc">I agree to the <a href="/terms" target="_blank">Terms and
+                        Conditions.</a></label>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui positive button">
+            confirm registration
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+    document.getElementById("name").addEventListener("keyup", function (event) {
+        if (event.keyCode === 13) {
+            event.preventDefault();
+            document.getElementById("btn login").click();
+        } else
+            document.getElementById("name-div").classList.remove('error');
+    });
+
+    document.getElementById("password").addEventListener("keyup", function (event) {
+        if (event.keyCode === 13) {
+            event.preventDefault();
+            document.getElementById("btn login").click();
+        } else
+            document.getElementById("password-div").classList.remove('error');
+    });
+
+    document.getElementById("input-password2").addEventListener("keyup", function (event) {
+        document.getElementById("field-password2").classList.remove('error');
+    });
+
+    document.getElementById("input-email").addEventListener("keyup", function (event) {
+        document.getElementById("field-email").classList.remove('error');
+    });
+
+    function validateEmail(email) {
+        var re = /\S+@\S+\.\S+/;
+        return re.test(email);
+    }
+
+    $(document).ready(function () {
+        const token = window.localStorage.getItem("RPAtoken")
+        console.log("token from local storage:" + token)
+        if (token)
+            window.location.replace("/dashboard")
+    })
+
+    function login(register_attempt) {
+        const succLabel = document.getElementById("reg-success-label")
+        succLabel.style.display = "none"
+        document.getElementById("input-tc").checked = false
+        document.getElementById("input-password2").value = ""
+        document.getElementById("input-email").value = ""
+        document.getElementById("field-password2").classList.remove('error');
+        document.getElementById("field-email").classList.remove('error');
+        const name = document.getElementById("name").value
+        const password = document.getElementById("password").value
+        if (name == "") {
+            document.getElementById("name-div").classList.add('error');
+        }
+        if (password == "") {
+            document.getElementById("password-div").classList.add('error');
+        }
+        if (name != "" && password != "") {
+            console.log("name and password given")
+            const data = {
+                username: name,
+                password: password
+            }
+            const response = $.get("/check_user/" + name, function () {
+                console.log("asked for existence of account " + name)
+                const exists = (response.responseJSON["exists"])
+
+                if (exists && !register_attempt) {
+
+                    const response = $.ajax({
+                        url: "/token",
+                        type: "POST",
+                        data: {"username": name, "password": password},
+                        dataType: 'json',
+                        success: function () {
+                            const token = response.responseJSON["access_token"]
+                            console.log("successful login attempt, token : " + token)
+                            window.localStorage.setItem("RPAtoken", token);
+                            window.localStorage.setItem("RPAtoken", token);
+                            window.location.replace("/dashboard")
+                        },
+                        error: function () {
+                            $('#modal-invalidpw').modal('show');
+                        }
+                    });
+
+                    // const response = $.post("/token", data, function (data, status) {
+                    //         const token = response.responseJSON["access_token"]
+                    //         console.log("successful login attempt, token : " + token)
+                    //         if (token == "") {
+                    //             $('#modal-invalidpw').modal('show');
+                    //         } else {
+                    //             window.localStorage.setItem("token", token);
+                    //
+                    //             window.location.replace("/dashboard")
+                    //         }
+                    //     }
+                    // );
+                }
+                if (!exists && !register_attempt) {
+                    $('#modal-namenotfound').modal('show');
+                }
+                if (exists && register_attempt) {
+                    $('#modal-nametaken').modal('show');
+                }
+                if (!exists && register_attempt) {
+                    console.log("trying to register " + name)
+                    $('#modal-register').modal({
+                        onApprove: function () {
+                            const password2 = document.getElementById("input-password2").value
+                            const email = document.getElementById("input-email").value
+                            console.log(password, password2, email)
+
+                            const valid_email = validateEmail(email)
+                            const tc_checked = document.getElementById("input-tc").checked
+                            console.log("checkbox: " + tc_checked)
+                            if (password == password2 && valid_email && tc_checked) {
+                                const data = {
+                                    username: name,
+                                    password: password,
+                                    email: email
+                                }
+
+                                const response = $.post("/register", JSON.stringify(data), function (data, status) {
+                                        console.log(response.responseJSON["message"])
+                                    }
+                                );
+                                succLabel.style.display = "block";
+                                return true;
+                            }
+                            if (password != password2) {
+                                document.getElementById("field-password2").classList.add('error');
+                            }
+
+                            if (!valid_email) {
+                                document.getElementById("field-email").classList.add('error');
+                            }
+
+                            if (!tc_checked) {
+                                document.getElementById("text-tc").style.textDecoration = "underline"
+                            }
+
+                            return false;
+                        }
+                    }).modal('show');
+                }
+            })
+
+        }
+
+    }
+
+    // function register() {
+    //     const name = document.getElementById("name").value
+    //     const password = document.getElementById("password").value
+    //     const password2 = document.getElementById("password2").value
+    //     console.log(password, password2)
+    //     if (password != password2) {
+    //         event.preventDefault()
+    //     } else {
+    //         const data = {
+    //             username: name,
+    //             password: password
+    //         }
+    //         const response = $.post("/register", data, function (data, status) {
+    //                 console.log(response.responseJSON["message"])
+    //             }
+    //         );
+    //     }
+    //
+    // }
+
+    // function register() {
+    //     const name = document.getElementById("name").value
+    //     const password = document.getElementById("password").value
+    //     if (name == "") {
+    //         javascript:alert('provide a username')
+    //     } else if (password == "")
+    //         javascript:alert('provide a password')
+    //     else {
+    //         const data = {
+    //             username: name,
+    //             password: password
+    //         }
+    //         const response = $.get("/check_user/" + name, function () {
+    //             console.log("asked for existence of account" + name)
+    //             const exists = (response.responseJSON["exists"])
+    //             if (exists) {
+    //                 javascript:alert('username already taken')
+    //             } else {
+    //                 console.log("trying to register " + name)
+    //                 const response = $.post("/register", data, function (data, status) {
+    //                         console.log(response.responseJSON["message"])
+    //
+    //                     }
+    //                 );
+    //             }
+    //         })
+    //
+    //     }
+    // }
+
+</script>
+
+
+{% endblock %}

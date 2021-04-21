@@ -1,0 +1,119 @@
+{% extends "layout.html"%}
+
+{%block content%}
+
+    <div class="ui input">
+        <input id="username" type="text" placeholder="username" autocomplete="off">
+    </div>
+
+    <button id="play" class="ui button primary">
+        play
+    </button>
+
+
+<div id="modal_noname" class="ui modal">
+    <i class="close icon"></i>
+    <div class="content">
+        Please enter a username
+    </div>
+    <div class="actions">
+        <div class="ui black deny button">
+            ok
+        </div>
+    </div>
+</div>
+
+
+<div id="modal_olduser" class="ui modal">
+    <i class="close icon"></i>
+    <div class="header">
+        provide the password to login
+    </div>
+    <div class="content">
+        <div class="ui input">
+            <input id="password" type="text" placeholder="password" autocomplete="off">
+        </div>
+        <!--<a href="/rps"><button onclick="play(event)" class="ui button primary" id="play">play</button></a>-->
+        <button id="btn login" class="ui button primary" onclick="login(event)">
+            login
+        </button>
+    </div>
+</div>
+
+<div id="modal_newuser" class="ui modal">
+    <i class="close icon"></i>
+    <div class="header">
+        Claim this username by providing a password
+    </div>
+    <div class="content">
+            <div class="ui input">
+                <input id="password new" type="text" placeholder="password" autocomplete="off">
+            </div>
+            <!--<a href="/rps"><button onclick="play(event)" class="ui button primary" id="play">play</button></a>-->
+            <button id="btn register" class="ui button primary" onclick="register(event)">
+                register
+            </button>
+    </div>
+</div>
+
+
+<script>
+
+    function register() {
+        console.log("register?")
+        const name = document.getElementById("username").value
+        const password = document.getElementById("password new").value
+        $.ajax({
+              url: '/register',
+              type: 'POST',
+              contentType: 'application/json',
+              data: JSON.stringify({"name": name, "password": password}),
+              dataType: 'json'
+            })
+
+    }
+
+    function login(){
+        console.log("login attempt")
+        const name = document.getElementById("username").value
+        const password = document.getElementById("password").value
+        console.log(name, password)
+        $.ajax({
+            url: "/login",
+            type: "POST",
+            contentType: 'application/json',
+              data: JSON.stringify({"name": name, "password": password}),
+              dataType: 'json'
+        })
+    }
+
+    $(document).ready(function () {
+        $("#play").click(function () {
+
+            console.log("opening modal")
+            var name = $("#username").val()
+
+            if (name == "") {
+                $('#modal_noname').modal('show');
+                console.log("no name given")
+            } else {
+                var old;
+
+                function check_user() {
+                    return $.get('/check_user/' + name);
+                }
+
+                check_user().done(function (result) {
+                    console.log(result)
+                    old = Boolean(result["message"] == "old")
+                    if (old) {
+                        $('#modal_olduser').modal('show');
+                    } else {
+                        $('#modal-*_newuser').modal('show');
+                    }
+                })
+            }
+        })
+    })
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+<script src="https://code.jquery.com/jquery-3.1.1.min.js"
+        integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+<style>
+    body {
+        background-color: #ffffff;
+    }
+</style>
+
+<head>
+    <meta charset="UTF-8">
+    <title>RockPaperAgents!</title>
+
+</head>
+<body>
+<div class="ui container">
+    <div class="ui sizer vertical segment">
+        <span class="ui huge header"> Rock Paper Agents! </span>
+        {%block loginbar%}{% endblock%}
+    </div>
+    {%block dashboard%}
+    {%endblock%}
+</div>
+</body>
+</html>
