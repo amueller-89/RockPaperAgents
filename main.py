@@ -158,6 +158,11 @@ def test_db(db: Session = Depends(get_db)):
     populate(db)
 
 
+@app.get("/test2")
+def test2():
+    pass
+
+
 ######## no longer in use. templates might have been moved!
 @app.get("/login")
 def login(request: Request):
