@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import jwt, JWTError
+import random
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -10,10 +11,11 @@ from starlette import status
 
 from database import SessionLocal
 from models_pyd import MessageResponse, UserPydantic, RegisterRequest, MessageRequest
-from models_DB import UserDB, MessageDB
+import RPS
+from models_DB import UserDB, MessageDB, RPS_PlayerDB, RockPaperScissorsDB
 
 
-# populates the database with a bunch of user accounts and messages
+# populates the database with a bunch of user accounts and messages, RPS games and moves
 def populate(db: Session):
     alex = RegisterRequest(username="alex", email="alex@example.com", password="geheim")
     create_user(register_request=alex, db=db)
@@ -26,33 +28,54 @@ def populate(db: Session):
 
     ivan = db.query(UserDB).filter(UserDB.username == "ivan").one_or_none()
     alex = db.query(UserDB).filter(UserDB.username == "alex").one_or_none()
-    martha = db.query(UserDB).filter(UserDB.username == "martha").one_or_none()
-    set_avatar('zac', ivan, db)
-    set_avatar('lucian', alex, db)
-    set_avatar('lilia', martha, db)
+    # martha = db.query(UserDB).filter(UserDB.username == "martha").one_or_none()
+    # set_avatar('zac', ivan, db)
+    # set_avatar('lucian', alex, db)
+    # set_avatar('lilia', martha, db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
+    # create_message(message_request=msg, db=db)
 
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
-    create_message(message_request=msg, db=db)
+    # print("ids ivan, alex: ", ivan.id, alex.id)
+    # # no bidirectionality
+    # print("ivan sent:")
+    # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.sender == ivan)])
+    # print("alex received:")
+    # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.recipient == alex)])
 
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
-    create_message(message_request=msg, db=db)
+    for i in range(0, 4):
+        rps_request = RPS.Game_Request(player1="alex", player2="ivan", goal=2)
+        RPS.create_game(rps_request, db)
+    # find ivan's oldest unfinished game
 
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
-    create_message(message_request=msg, db=db)
+    for i in range(0, 20):
+        # filter for unfinished games with ivan in them
+        ivan_games = RPS.getGames(ivan, db)
+        ivan_games = ivan_games.filter(RockPaperScissorsDB.finished == False)
+        # sort by date created, oldest first
+        ivan_games = ivan_games.order_by(RockPaperScissorsDB.date_created)
+        game = ivan_games.first()
+        print("ivans oldest unfinished is #", game.id)
 
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
-    create_message(message_request=msg, db=db)
-
-    print("ids ivan, alex: ", ivan.id, alex.id)
-    # no bidirectionality
-    print("ivan sent:")
-    print([msg.content for msg in db.query(MessageDB).filter(MessageDB.sender == ivan)])
-    print("alex received:")
-    print([msg.content for msg in db.query(MessageDB).filter(MessageDB.recipient == alex)])
+        # commit a random move for both of us, to a random game
+        game = ivan_games.all()[random.randint(0, len(ivan_games.all()) - 1)]
+        move_request = RPS.Move_Request(move=random.randint(0, 2), user_id=ivan.id, game_id=game.id)
+        RPS.commit_move(move_request, db)
+        move_request = RPS.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
+        RPS.commit_move(move_request, db)
 
 
 # security settings and initializations

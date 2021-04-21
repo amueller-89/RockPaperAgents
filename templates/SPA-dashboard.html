@@ -80,9 +80,10 @@
                     current = messages[i]
                     prettyDate = dateConvert(current["date"])
                     //TODO reply knopf mal mindestens
+
                     if(current["content"].length>140){
                         current["content"] = current["content"].substr(0,140 )
-                        current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or smth like that
+                        current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
                     }
 
                     var msgHTML = '<div class="comment"><a class="avatar">\n' +
@@ -106,7 +107,7 @@
         document.getElementById("input-recipient").value = name
         document.getElementById("input-message").value = ""
         $('#modal-newmessage').modal('show')
-        $("#input-message").focus();
+        $("#input-message").focus(); // TODO after this is executed, focus jumps back to the recipient field. why?
     }
 
     function dateConvert(datetime) {

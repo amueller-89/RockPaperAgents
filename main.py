@@ -43,14 +43,10 @@ def terms(request: Request):
 # check if a given username exists in the database
 @app.get("/check_user/{username}")
 async def check_user(username: str, db: Session = Depends(get_db)):
-    if db.query(UserDB).filter(UserDB.username == username).one_or_none():
-        exists = True
-    else:
-        exists = False
-    print(f"{username} exists: {exists}")
+    # print(f"{username} exists: {exists}")
     return {
         "code": "success",
-        "exists": exists
+        "exists": True if db.query(UserDB).filter(UserDB.username == username).one_or_none() else False
     }
 
 
@@ -96,9 +92,9 @@ async def acquire_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Se
 ####### public get-endpoints
 
 # returns the (50px*50px, for now) avatar of the given user
-@app.get("/avatar/{username}")
-def avatar(username):
-    return FileResponse("images/avatar/" + username + ".jpg")
+@app.get("/avatar/{avatar_name}")
+def avatar(avatar_name):
+    return FileResponse("images/avatar/" + avatar_name + ".jpg")
 
 
 # returns a list of available games
