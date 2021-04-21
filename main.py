@@ -98,7 +98,7 @@ async def acquire_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Se
 # returns the (50px*50px, for now) avatar of the given user
 @app.get("/avatar/{username}")
 def avatar(username):
-    return FileResponse("templates/images/avatar/" + username + ".jpg")
+    return FileResponse("images/avatar/" + username + ".jpg")
 
 
 # returns a list of available games
