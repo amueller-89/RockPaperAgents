@@ -10,4 +10,6 @@ yfinance~=0.1.59
 passlib~=1.7.4
 
 starlette~=0.13.6
-jose
+python-jose[cryptography]
+bcrypt
+aiofiles
