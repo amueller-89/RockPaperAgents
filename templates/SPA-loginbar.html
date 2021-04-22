@@ -29,7 +29,6 @@
     </div>
 </div>
 
-
 <!--<div class="ui huge label" id="reg-success-label" style="display: none">-->
 <!--    Registration successful!-->
 <!--</div>-->
@@ -49,9 +48,9 @@
 </div>
 
 <div id="modal-invalidpw" class="ui mini modal">
-    <div class="header">Choose your Avatar</div>
+    <div class="header">Login Failed</div>
     <div class="content">
-        Nothing
+        Invalid password
     </div>
     <div class="actions">
         <div class="ui black deny button">
@@ -126,8 +125,8 @@
 
     function account() {
         const response = $.ajax({
-            url: "/change_avatar/",
-            type: "POST",
+            url: "/get_default_avatars/",
+            type: "GET",
             success: function () {
                 var default_avatars = document.getElementById("list-default-avatars")
                 default_avatars.innerHTML = ""
