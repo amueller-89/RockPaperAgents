@@ -29,6 +29,7 @@
     </div>
 </div>
 
+
 <!--<div class="ui huge label" id="reg-success-label" style="display: none">-->
 <!--    Registration successful!-->
 <!--</div>-->
@@ -48,9 +49,9 @@
 </div>
 
 <div id="modal-invalidpw" class="ui mini modal">
-    <div class="header">Login failed</div>
+    <div class="header">Choose your Avatar</div>
     <div class="content">
-        Invalid password
+        Nothing
     </div>
     <div class="actions">
         <div class="ui black deny button">
@@ -99,11 +100,70 @@
 </div>
 
 
+<div id="modal-choose-avatar" class="ui mini modal">
+    <div class="header">Choose your Avatar</div>
+    <div class="content">
+        <div class="btn-toolbar" role="toolbar" id="list-default-avatars">
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui black deny button">
+            ok
+        </div>
+    </div>
+</div>
+
+    <style>
+        .avatar {
+          vertical-align: middle;
+          width: 50px;
+          height: 50px;
+          border-radius: 10%;
+        }
+    </style>
+
 <script>
 
-    // TODO avatar waehlen zB
-    function account(){
-        console.log("account settings i guess")
+    function account() {
+        const response = $.ajax({
+            url: "/change_avatar/",
+            type: "POST",
+            success: function () {
+                var default_avatars = document.getElementById("list-default-avatars")
+                default_avatars.innerHTML = ""
+                $('#modal-choose-avatar').modal("show");
+
+                response.responseJSON["default_avatars"].forEach(
+                    avatar_name => {
+                        default_avatar_HTML =
+                            '<button type="button" class="btn btn-primary" onclick="set_avatar(\'' + avatar_name + '\')">' +
+                            '<img src="avatar/' + avatar_name + '"alt="Avatar" class="avatar">' +
+                            '</button>'
+                        default_avatars.innerHTML += default_avatar_HTML
+                    }
+                )
+            },
+            error: function () {
+                console.log(send.responseJSON)
+            }
+        });
+    }
+
+    function set_avatar(avatar_name) {
+        const token = window.localStorage.getItem("RPAtoken")
+        $.ajax({
+            url: "/myavatar/" + avatar_name,
+            type: "PUT",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                console.log("Chose avatar: " + avatar_name + " in account settings.")
+            },
+            error: function () {
+                console.log(send.responseJSON)
+            }
+        })
     }
 
 
