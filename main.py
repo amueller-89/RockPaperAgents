@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
@@ -6,13 +8,14 @@ from fastapi.responses import FileResponse
 from datetime import timedelta
 from sqlalchemy.orm import Session
 
+import RPS
 from utilities import ACCESS_TOKEN_EXPIRE_MINUTES, get_db, create_access_token, get_current_user, get
 from utilities import populate, verify_password, make_message_response_from_db
 from utilities import create_message, set_avatar, create_user
-from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest
+from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest, GameType
 
 from database import engine
-from models_DB import UserDB, MessageDB
+from models_DB import UserDB, MessageDB, RockPaperScissorsDB, RPS_PlayerDB
 import models_DB
 
 app = FastAPI()
@@ -21,7 +24,10 @@ templates = Jinja2Templates(directory="templates")
 
 models_DB.Base.metadata.create_all(bind=engine)
 
-games = ["Rock Paper Scissors", "Slip Strike", "Indonesian Finger Game", "Draft Diff"]
+games = [["Rock Paper Scissors", "blue", True], ["Slip Strike", "teal", True],
+         ["Indonesian Finger Game", "brown", False], ["Draft Diff", "olive", False]]
+
+games2 = [GameType(name=game[0], color=game[1], active=game[2]) for game in games]
 
 
 ######## HTML endpoints
@@ -100,6 +106,7 @@ def avatar(avatar_name):
 # returns a list of available games
 @app.get("/games")
 def games_available():
+    print(games2)
     return games
 
 
@@ -112,15 +119,28 @@ async def me(current_user: UserPydantic = Depends(get_current_user)):
     return current_user  # html response(current_user)?
 
 
-# returns a list of the 5 last recent received messages
-# TODO this should get a (query?) parameter for the number of messages
+# returns a list of the last {limit} recent received messages, where limit is a query parameter
 @app.get("/myrecentmessages")
-async def recent_incoming(current_user: UserPydantic = Depends(get_current_user), db: Session = Depends(get_db)):
+async def recent_incoming(limit: int = 5, current_user: UserPydantic = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
     me_db = get(current_user.username, db)
     all_queryset = db.query(MessageDB).filter(MessageDB.recipient == me_db)
-    ordered_list = all_queryset.order_by(MessageDB.date.desc()).limit(5).all()
+    ordered_list = all_queryset.order_by(MessageDB.date.desc()).limit(limit).all()
     recents_pyd = [make_message_response_from_db(msg_db) for msg_db in ordered_list]
     return recents_pyd
+
+
+# TODO probably this should have more query parameters like finished, unfinished, RPS/whatever else we might have...
+# error handling lol
+# returns the last {limit} active games of the current user
+@app.get("/myCurrentGames")
+async def recent_games(limit: int = 10, current_user: UserPydantic = Depends(get_current_user),
+                       db: Session = Depends(get_db)):
+    me = get(current_user.username, db)
+    games = RPS.getGames(me, db).filter(RockPaperScissorsDB.finished == False) \
+        .order_by(RockPaperScissorsDB.last_activity.desc()).limit(limit).all()
+    response = [RPS.make_response_from_db(game=game, my_name=me.username) for game in games]
+    return response
 
 
 # sends a message from the current user
@@ -154,6 +174,47 @@ async def choose_avatar(name: str, current_user: UserPydantic = Depends(get_curr
         "code": "success",
         "message": "put " + name + " as avatar for " + user_db.username
     }
+
+
+@app.put("/playRPS/")
+async def playRPS(game: int, move: int,
+                  current_user: UserPydantic = Depends(get_current_user),
+                  db: Session = Depends(get_db)):
+    move_request = RPS.Move_Request(move=move, user_id=get(current_user.username, db).id, game_id=game)
+    if not move_request:
+        return {
+            "code": "error",
+            "message": f"something went wrong creating the move request"
+        }
+    rps = RPS.commit_move(move_request, db)
+    if rps:
+        return {
+            "code": "success",
+            "message": f"committed move {move} for RPS game#{rps.id} for  {current_user.username}"
+        }
+    else:
+        return {
+            "code": "error",
+            "message": f"something went wrong. likely the game is finished"
+        }
+
+
+@app.post("/createRPS/{opponent}")
+async def createRPS(opponent: str, goal: Optional[int] = None,
+                    current_user: UserPydantic = Depends(get_current_user),
+                    db: Session = Depends(get_db)):
+    game_request = RPS.Game_Request(player1=current_user.username, player2=opponent, goal=goal)
+    rps = RPS.create_game(game_request, db)
+    if rps:
+        return {
+            "code": "success",
+            "message": f"created new RPS game#{rps.id},  {current_user.username} vs {opponent}, first to {rps.goal}"
+        }
+    else:
+        return {
+            "code": "error",
+            "message": f"something went wrong"
+        }
 
 
 #######################################

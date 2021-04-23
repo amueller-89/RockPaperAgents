@@ -4,10 +4,15 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class GameType(BaseModel):
+    name: str
+    color: str
+    active: bool
+
+
 class UserPydantic(BaseModel):
     username: str
     email: Optional[str] = None
-    # hashed_password: str
     avatar: Optional[str] = None
 
 
@@ -45,5 +50,3 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
-
-

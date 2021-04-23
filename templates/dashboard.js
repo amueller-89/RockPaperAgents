@@ -1,8 +1,3 @@
-{% extends "SPA-loginbar.html"%}
-
-{%block dashboard%}
-<script>
-
 let loggedIn    //are these usefuL?
 let username
 let gameCreateButtons = []
@@ -132,9 +127,10 @@ function getMyRecentMessages() {
             if (max < 0)
                 max = 0
             for (let i = messages.length - 1; i >= max; i--) {
-                //await new Promise(r => setTimeout(r, 2000));
-                let current = messages[i]
-                let prettyDate = dateConvert(current["date"])
+
+
+                current = messages[i]
+                prettyDate = dateConvert(current["date"])
                 //TODO reply knopf mal mindestens
 
                 if (current["content"].length > 140) {
@@ -143,7 +139,7 @@ function getMyRecentMessages() {
                 }
 
                 var msgHTML = '<div class="comment"><a class="avatar">\n' +
-                    '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
+                    '                        <img src="avatar/' + current["sender_avatar"] + '">\n' +
                     '                    </a><div class="content">\n' +
                     '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
                     '                            <span class="date">' + prettyDate + '</span>\n' +
@@ -151,6 +147,8 @@ function getMyRecentMessages() {
                     '                            <a class="reply">Reply</a>\n' +
                     '                        </div></div>'
                 msg_list.innerHTML += msgHTML
+
+
             }
         }
 
@@ -233,83 +231,3 @@ function send() {
     });
 }
 
-</script>
-
-<h2>Dashboard </h2>
-
-<hr>
-
-<div class="ui grid">
-    <div class="left floated four wide column">
-        <h3 class="ui dividing header">create game</h3>
-        <div class="ui list" id="list-games">
-        </div>
-
-    </div>
-
-    <div class="four wide column">
-        <h3 class="ui dividing header">open challenges</h3>
-    </div>
-
-    <div class="four wide column">
-        <h3 class="ui dividing header">your current games</h3>
-        <div class="ui list" id="list-current-games">
-        </div>
-    </div>
-
-    <div class="right floated four wide column">
-        <div class="ui comments">
-            <h3 class="ui dividing header">Recent private messages</h3>
-            <div id="list-messages">
-            </div>
-        </div>
-    </div>
-</div>
-
-<hr>
-
-
-<div class="ui grid">
-    <div class="left floated four wide column">
-        <button class="ui icon button">
-            <i class="hand rock outline icon"></i><br>
-        </button>
-        <button class="ui icon button">
-            <i class="hand paper outline icon"></i><br>
-        </button>
-        <button class="ui icon button">
-            <i class="hand scissors icon outline"></i>
-        </button>
-    </div>
-    <div class="right floated four wide column">
-        <button class="ui labeled icon button" id="btn-newmessage" onclick="$('#modal-newmessage').modal('show');">
-            <i class="paper plane outline icon"></i>
-            new message
-        </button>
-
-    </div>
-
-</div>
-
-<div id="modal-newmessage" class="ui small modal">
-    <i class="close icon"></i>
-    <div class="header">Compose message</div>
-    <div class="content">
-        <form class="ui form">
-            <div class="field" id="field-recipient">
-                <input type="text" id="input-recipient" placeholder="Recipient">
-            </div>
-            <div class="field">
-                <textarea rows="4" placeholder="Your message" id="input-message"></textarea>
-            </div>
-        </form>
-    </div>
-    <div class="actions">
-        <button class="ui labeled icon button" id="btn-msg" onclick="send()">
-            <i class="paper plane outline icon"></i>
-            send
-        </button>
-    </div>
-</div>
-
-{% endblock dashboard %}
