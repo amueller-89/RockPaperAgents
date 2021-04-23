@@ -15,7 +15,7 @@ from utilities import create_message, set_avatar, create_user
 from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest, GameType
 
 from database import engine
-from models_DB import UserDB, MessageDB, RockPaperScissorsDB, RPS_PlayerDB
+from models_DB import UserDB, MessageDB, RockPaperScissorsDB
 import models_DB
 
 app = FastAPI()
@@ -106,7 +106,7 @@ def avatar(avatar_name):
 # returns a list of available games
 @app.get("/games")
 def games_available():
-    print(games2)
+    #print(games2)
     return games
 
 
@@ -168,10 +168,10 @@ async def choose_avatar(name: str, current_user: UserPydantic = Depends(get_curr
 
 
 @app.put("/playRPS/")
-async def playRPS(game: int, move: int,
+async def playRPS(move_request: RPS.Move_Request,
                   current_user: UserPydantic = Depends(get_current_user),
                   db: Session = Depends(get_db)):
-    move_request = RPS.Move_Request(move=move, user_id=get(current_user.username, db).id, game_id=game)
+    move_request.user_id = get(current_user.username, db).id
     if not move_request:
         return {
             "code": "error",
@@ -181,7 +181,7 @@ async def playRPS(game: int, move: int,
     if rps:
         return {
             "code": "success",
-            "message": f"committed move {move} for RPS game#{rps.id} for  {current_user.username}"
+            "message": f"committed move {move_request.move} for RPS game#{rps.id} for  {current_user.username}"
         }
     else:
         return {
