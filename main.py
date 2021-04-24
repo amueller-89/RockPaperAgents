@@ -103,6 +103,17 @@ def avatar(avatar_name):
     return FileResponse("images/avatar/" + avatar_name + ".jpg")
 
 
+# returns the victory splash
+@app.get("/games/victory")
+def victory_splash():
+    return FileResponse("images/games/victory.png")
+
+# returns the defeat splash
+@app.get("/games/defeat")
+def defeat_splash():
+    return FileResponse("images/games/defeat.png")
+
+
 # returns a list of available games
 @app.get("/games")
 def games_available():
@@ -132,14 +143,17 @@ async def recent_incoming(limit: int = 5, current_user: UserPydantic = Depends(g
 
 # TODO probably this should have more query parameters like finished, unfinished, RPS/whatever else we might have...
 # error handling lol
-# returns the last {limit} active games of the current user
-@app.get("/myCurrentGames")
-async def recent_games(limit: int = 10, current_user: UserPydantic = Depends(get_current_user),
+# returns all active and the last {limit} finished games of the current user
+@app.get("/myGames")
+async def recent_games(limit: int = 5, current_user: UserPydantic = Depends(get_current_user),
                        db: Session = Depends(get_db)):
-    me = get(current_user.username, db)
-    games = RPS.getGames(me, db).filter(RockPaperScissorsDB.finished == False) \
+    me_db = get(current_user.username, db)
+    current_games = RPS.getGames(me_db, db).filter(RockPaperScissorsDB.finished == False) \
+        .order_by(RockPaperScissorsDB.last_activity.desc()).all()
+    finished_games = RPS.getGames(me_db, db).filter(RockPaperScissorsDB.finished == True) \
         .order_by(RockPaperScissorsDB.last_activity.desc()).limit(limit).all()
-    response = [RPS.make_response_from_db(game=game, my_name=me.username) for game in games]
+
+    response = [RPS.make_response_from_db(game=game, my_name=me_db.username) for game in (current_games+finished_games)]
     return response
 
 
