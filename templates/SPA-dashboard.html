@@ -217,6 +217,7 @@
         rps_id = id
         rps_move = -1
         document.getElementById('btn-shoot').classList.add('disabled')
+        document.getElementById('btn-shoot').innerHTML = "Shoot"
         //cleanup
 
         let game = currentGames[id]
@@ -236,6 +237,7 @@
             document.getElementById("btn-0").classList.add('disabled')
             document.getElementById("btn-1").classList.add('disabled')
             document.getElementById("btn-2").classList.add('disabled')
+            document.getElementById('btn-shoot').innerHTML = '<i class=\"check icon\"></i>'
         } else {
             document.getElementById("btn-0").classList.remove('disabled')
             document.getElementById("btn-1").classList.remove('disabled')
@@ -267,8 +269,11 @@
         } else {
             scoreHTML += game["my_score"] + " - " + game["opponent_score"]
         }
-
         document.getElementById("rps-score").innerHTML += scoreHTML
+
+        document.getElementById("rps-info").innerHTML = "RPS game #"+ game.id+"<br>last active: "+dateConvert(game.last_activity)+"<br>created: " + dateConvert(game.date_created)
+
+
     }
 
     function showRPS(id) {
@@ -525,7 +530,8 @@
                         </div>
                         <div class="row">
                             <div class="right aligned column">
-                                <button class="ui primary disabled button" id="btn-shoot" onclick="play_rps()"> Shoot
+                                <button class="ui primary disabled button" id="btn-shoot" onclick="play_rps()"><i
+                                        class="check icon"></i>
                                 </button>
                             </div>
                         </div>
@@ -542,7 +548,8 @@
                         </div>
                         <div class="row">
                             <div class="left aligned column">
-                                <button class="ui primary disabled loading button" id="btn-shoot-opp"> Shoot</button>
+                                <button class="ui primary disabled loading button" id="btn-shoot-opp"><i
+                                        class="check icon"></i></button>
                             </div>
                         </div>
                     </div>
@@ -551,13 +558,18 @@
         </div>
     </div>
     <div class="actions">
-        <div class="ui left aligned container">
-            <button class="ui black deny button">
-                resign
-            </button>
-            <div class="ui checkbox">
-                <input type="checkbox" tabindex="0">
-                <label>Yes, I'm sure</a></label>
+        <div class="ui two columns grid">
+            <div class="left aligned column">
+                <button class="ui black deny button">
+                    resign
+                </button>
+                <div class="ui checkbox">
+                    <input type="checkbox" tabindex="0">
+                    <label>Yes, I'm sure</a></label>
+                </div>
+            </div>
+            <div class="ui right aligned column">
+               <text style="font-size: smaller; color: grey" id="rps-info"></text>
             </div>
         </div>
     </div>
