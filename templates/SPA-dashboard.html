@@ -9,7 +9,7 @@
     let gameCreateButtons = []
     let gameColors = []
 
-    let currentGames        // array of Game_Responses
+    let currentGames = {}       // array of Game_Responses
 
     let rps_move = -1
     let rps_id
@@ -57,11 +57,12 @@
         document.getElementById("name").value = ""
         document.getElementById("password").value = ""
         // TODO disable create buttons
-        console.log(gameCreateButtons)
+        //console.log(gameCreateButtons)
         gameCreateButtons.forEach(disable_create_button);
 
         username = ""
         loggedIn = false
+        currentGames = {}
     }
 
 
@@ -95,6 +96,27 @@
         });
     }
 
+    function getRps(rps_id) {
+        const token = window.localStorage.getItem("RPAtoken")
+        const rpsGET = $.ajax({
+            url: "/myrps",
+            type: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            data: {"id": rps_id},
+            success: function () {
+                let responseJSON = rpsGET.responseJSON
+                console.log(responseJSON)
+                currentGames[rps_id] = responseJSON
+                console.log(currentGames)
+                configure_rps_view(rps_id)
+            },
+            error: function () {
+
+            }
+        })
+    }
 
     function getMyCurrentGames() {
         const token = window.localStorage.getItem("RPAtoken")
@@ -105,25 +127,30 @@
                 xhr.setRequestHeader('Authorization', "Bearer " + token);
             },
             success: function () {
-                currentGames = myGamesGET.responseJSON
+                let gamesJSON = myGamesGET.responseJSON
+                for (let i in gamesJSON) {
+                    currentGames[gamesJSON[i]["id"]] = gamesJSON[i]
+                }
                 console.log(currentGames)
                 let current_games_list = document.getElementById("list-current-games")
                 current_games_list.innerHTML = ""
-                for (let i = 0; i < currentGames.length; i++) {
+                for (let i = 0; i < gamesJSON.length; i++) {
                     let border = ""
-                    if (currentGames[i]["has_moved_me"]) {
+                    if (gamesJSON[i]["has_moved_me"]) {
                         border += "green"
                     }
-                    if (currentGames[i]["has_moved_opponent"]) {
+                    if (gamesJSON[i]["has_moved_opponent"]) {
                         border += "red"
                     }
-                    let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + currentGames[i]["id"] + ')">'
-                        + currentGames[i]["my_score"] + ' - ' + currentGames[i]["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + currentGames[i]["id"] + ')">vs. '
-                        + currentGames[i]["opponent"]
+                    let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + gamesJSON[i]["id"] + ')">'
+                        + gamesJSON[i]["my_score"] + ' - ' + gamesJSON[i]["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + gamesJSON[i]["id"] + ')">vs. '
+                        + gamesJSON[i]["opponent"]
                         + '</div></div></div>'
 
                     current_games_list.innerHTML += btnHTML
                 }
+
+
             },
             error: function () {
 
@@ -183,31 +210,25 @@
         document.getElementById("btn-" + game).classList.remove("disabled")
     }
 
-
-    function showRPS(id) {
-        console.log("show rps# " + id)
+    function configure_rps_view(id) {
         document.getElementById("rps-opponent").innerHTML = ""
-        document.getElementById("rps-me").innerHTML = ""    //cleanup
+        document.getElementById("rps-me").innerHTML = ""
         document.getElementById("rps-score").innerHTML = ""
         rps_id = id
         rps_move = -1
         document.getElementById('btn-shoot').classList.add('disabled')
+        //cleanup
 
+        let game = currentGames[id]
 
-        let game
-        for (let i = 0; i < currentGames.length; i++) {
-            if (currentGames[i]["id"] == id) {
-                game = currentGames[i]
-                break
-            }
-        }
         console.log(game)
 
         if (!game["has_moved_opponent"]) {
-            console.log("waiting for opp")
             document.getElementById('btn-shoot-opp').classList.add('loading')
+            if (game["has_moved_me"]) {
+                //TODO write waiting somewhere
+            }
         } else {
-            console.log("not waiting for opp")
             document.getElementById('btn-shoot-opp').classList.remove('loading')
         }
 
@@ -248,7 +269,11 @@
         }
 
         document.getElementById("rps-score").innerHTML += scoreHTML
+    }
 
+    function showRPS(id) {
+        console.log("show rps# " + id)
+        configure_rps_view(id)
         $('#modal-RPS').modal('show')
     }
 
@@ -328,8 +353,9 @@
             dataType: 'json',
             success: function () {
                 console.log("success committing move")
+                getRps(rps_id)
                 getMyCurrentGames()
-                $('#modal-rps').modal('hide').modal('hide dimmer');
+
             },
             error: function () {
                 //  general error handling ala oops something went wrong

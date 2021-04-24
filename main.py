@@ -106,7 +106,7 @@ def avatar(avatar_name):
 # returns a list of available games
 @app.get("/games")
 def games_available():
-    #print(games2)
+    # print(games2)
     return games
 
 
@@ -165,6 +165,18 @@ async def choose_avatar(name: str, current_user: UserPydantic = Depends(get_curr
         "code": "success",
         "message": "put " + name + " as avatar for " + user_db.username
     }
+
+
+@app.get("/myrps/")
+async def my_game_from_id(id: int, current_user: UserPydantic = Depends(get_current_user), db: Session = Depends(get_db)):
+    game = db.query(RockPaperScissorsDB).filter(RockPaperScissorsDB.id == id).one_or_none()
+    if not game:
+        return f"rps#{id} not found"
+    players = [player.user.username for player in game.players]
+    if current_user.username not in players:
+        return "that's not your game buddy"
+    response = RPS.make_response_from_db(game=game, my_name=current_user.username)
+    return response
 
 
 @app.put("/playRPS/")
