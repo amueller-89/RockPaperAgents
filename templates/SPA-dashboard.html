@@ -131,7 +131,7 @@
                     border += "red"
                 }
                 let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
-                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#'+game.id +' vs. '
+                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
                     + game["opponent"]
                     + '</div></div></div>'
 
@@ -155,7 +155,7 @@
                     border += "red"
                 }
                 let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
-                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#'+ game.id+' vs. '
+                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
                     + game["opponent"]
                     + '</div></div></div>'
 
@@ -264,7 +264,7 @@
                 xhr.setRequestHeader('Authorization', "Bearer " + token);
             },
             success: function () {
-                console.log("created new rps " + opponent + " " + goal)
+                console.log("created new rps vs " + opponent + ", goal: " + goal)
                 document.getElementById("field-rps-opp").classList.remove('error')
                 document.getElementById("input-rps-opp").value = ""
                 document.getElementById("input-rps-message").value = ""
@@ -368,10 +368,44 @@
     }
 
     function showRPS(id) {
+        document.getElementById("checkbox-rps-resign").checked = false
         rps_id = id
         console.log("show rps# " + id)
         configure_rps_view(id)
-        $('#modal-RPS').modal('show')
+        $('#modal-RPS').modal({
+            onApprove: function () {
+                console.log('on approve')
+                return false
+            }
+        }).modal('show')
+    }
+
+    function resign_rps(rps_id) {
+        let checked = document.getElementById("checkbox-rps-resign").checked
+        console.log("resign rps#" + rps_id + ", " + checked)
+        if (checked) {
+            const token = window.localStorage.getItem("RPAtoken")
+            const resign = $.ajax({
+                url: "/resignRPS/" + rps_id,
+                type: "put",
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader('Authorization', "Bearer " + token);
+                },
+                success: function () {
+                    console.log("resigned successfully, response:")
+                    console.log(resign.responseJSON)
+                    let game = resign.responseJSON
+                    fetchedGames[game.id] = game
+                    drawMyCurrentGames()
+                    drawMyFinishedGames()
+                },
+                error: function () {
+                    //  general error handling ala oops something went wrong
+                    console.log(resign.responseJSON)
+                }
+            });
+        }
+
     }
 
 
@@ -421,7 +455,9 @@
         document.getElementById("field-recipient").classList.remove('error')
         document.getElementById("input-recipient").value = name
         document.getElementById("input-message").value = ""
-        $('#modal-newmessage').modal('show')
+        $('#modal-newmessage').modal({
+            autofocus: false
+        }).modal('show')
         $("#input-message").focus(); // TODO after this is executed, focus jumps back to the recipient field. why?
     }
 
@@ -467,7 +503,6 @@
 
 
     function dateConvert(datetime) {
-        //console.log(datetime)
         let prettyDate = ""
         for (let i = 11; i < 16; i++)
             prettyDate += datetime[i]
@@ -539,7 +574,9 @@
         </button>
     </div>
     <div class="right floated four wide column">
-        <button class="ui labeled icon button" id="btn-newmessage" onclick="$('#modal-newmessage').modal('show');">
+        <button class="ui labeled icon button" id="btn-newmessage" onclick="$('#modal-newmessage').modal({
+    autofocus: true
+  }).modal('show');">
             <i class="paper plane outline icon"></i>
             new message
         </button>
@@ -684,11 +721,11 @@
         <div class="ui two columns grid">
             <div class="left aligned column">
                 <div id="rps-resign-div">
-                    <button class="ui black deny button">
+                    <button class="ui black button" onclick="resign_rps(rps_id)">
                         resign
                     </button>
                     <div class="ui checkbox">
-                        <input type="checkbox" tabindex="0">
+                        <input type="checkbox" id="checkbox-rps-resign" tabindex="0">
                         <label>Yes, I'm sure</a></label>
                     </div>
                 </div>

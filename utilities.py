@@ -12,7 +12,7 @@ from starlette import status
 from database import SessionLocal
 from models_pyd import MessageResponse, UserPydantic, RegisterRequest, MessageRequest
 import RPS
-from models_DB import UserDB, MessageDB
+from models_DB import UserDB, MessageDB, RockPaperScissorsDB
 
 
 # populates the database with a bunch of user accounts and messages, RPS games and moves
@@ -102,6 +102,17 @@ class ConnectionManager:
             print("opp not online")
             return
         await self.active_connections[opp].send_json(response.json())
+
+    async def inform_opponent(self, game: RockPaperScissorsDB, me: str):
+        for p in game.players:
+            if p.user.username != me:
+                opponent = p.user.username
+                print("vs opponent: " + opponent)
+        response = RPS.make_response_from_db(game=game, my_name=opponent)
+        if opponent not in self.active_connections:
+            print("opp not online")
+            return
+        await self.active_connections[opponent].send_json(response.json())
 
 
 # security settings and initializations

@@ -56,7 +56,7 @@ def make_response_from_db(game: RockPaperScissorsDB, my_name: str):
                          my_avatar=my_avatar,
                          opponent_score=opponent_score,
                          opponent_avatar=opponent_avatar,
-                         has_moved_opponent= has_moved_opponent,
+                         has_moved_opponent=has_moved_opponent,
                          has_moved_me=has_moved_me,
                          date_created=game.date_created,
                          last_activity=game.last_activity,
@@ -102,10 +102,31 @@ def commit_move(move_request: Move_Request, db: Session):
     return game
 
 
+def resign(id: int, me: str, db: Session):
+    print(f"resigning rps#{id} for {me}")
+    game = db.query(RockPaperScissorsDB).filter(RockPaperScissorsDB.id == id).one_or_none()
+    if not game:
+        return
+    for player in game.players:
+        if player.user.username != me:
+            player.score = game.goal
+    return update(game, db)
+
+
 def update(game: RockPaperScissorsDB, db: Session):
     print(f"updating RPS game# {game.id}")
     if game.finished:
         return game
+    for player in game.players:
+        if player.score >= game.goal:
+            print(player.user.username + " wins RPS#" + str(game.id))
+            game.finished = True
+            player.won = True
+            for player2 in game.players:
+                if player2 is not player:
+                    player2.won = False  # ugly af
+            db.commit()
+            return game
     for player in game.players:
         if player.committed_move is None:
             # print("not all moves committed")
@@ -124,14 +145,7 @@ def update(game: RockPaperScissorsDB, db: Session):
         p2.score += 1
     p1.committed_move = None
     p2.committed_move = None
-    for player in game.players:
-        if player.score >= game.goal:
-            print(player.user.username + " wins RPS#" + str(game.id))
-            game.finished = True
-            player.won = True
-            for player2 in game.players:
-                if player2 is not player:
-                    player2.won = False  # ugly af
+
     db.commit()
     return game
 

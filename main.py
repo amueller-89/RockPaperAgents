@@ -189,6 +189,7 @@ async def send_message(outgoing: OutgoingMessage, current_user: UserPydantic = D
     message_request = MessageRequest(sender_id=sender_id, recipient_id=recipient.id, content=outgoing.content)
     create_message(message_request, db)
 
+
 @app.get("/get_default_avatars/")
 async def get_default_avatars(current_user: UserPydantic = Depends(get_current_user)):
     default_avatars = ["ashe", "lilia", "lucian", "neeko", "yone", "zac"]
@@ -240,23 +241,23 @@ async def playRPS(move_request: RPS.Move_Request,
     move_request.user_id = get(current_user.username, db).id
     rps = RPS.commit_move(move_request, db)
     if rps:
-        print("preparing prod")
-        for p in rps.players:
-            if p.user.username != current_user.username:
-                opp = p.user.username
-                print("opponent: " + opp)
-        opp_response = RPS.make_response_from_db(game=rps, my_name=opp)
-        await manager.send_rps(opp_response, opp)
-        # return {
-        #     "code": "success",
-        #     "message": f"committed move {move_request.move} for RPS game#{rps.id} for  {current_user.username}"
-        # }
+        await manager.inform_opponent(rps, current_user.username)
         return RPS.make_response_from_db(game=rps, my_name=current_user.username)
     else:
         return {
             "code": "error",
             "message": f"something went wrong. likely the game is finished"
         }
+
+
+@app.put("/resignRPS/{id}")
+async def resignRPS(id: int, current_user: UserPydantic = Depends(get_current_user), db: Session = Depends(get_db)):
+    rps = RPS.resign(id, current_user.username, db)
+    if rps:
+        await manager.inform_opponent(rps, current_user.username)
+        return RPS.make_response_from_db(game=rps, my_name=current_user.username)
+    else:
+        raise HTTPException(status_code=400, detail="could not resign")
 
 
 @app.post("/createRPS/{opponent}/{goal}")
@@ -269,19 +270,17 @@ async def createRPS(opponent: str, goal: int,
     game_request = RPS.Game_Request(player1=current_user.username, player2=opponent, goal=goal)
     rps = RPS.create_game(game_request, db)
     if rps:
-        if rps:
-            print("preparing prod for new game")
-            for p in rps.players:
-                if p.user.username != current_user.username:
-                    opp = p.user.username
-                    print("vs opponent: " + opp)
-            opp_response = RPS.make_response_from_db(game=rps, my_name=opp)
-            await manager.send_rps(opp_response, opp)
+        #
+        # print("preparing prod for new game")
+        # for p in rps.players:
+        #     if p.user.username != current_user.username:
+        #         opp = p.user.username
+        #         print("vs opponent: " + opp)
+        # opp_response = RPS.make_response_from_db(game=rps, my_name=opp)
+        # await manager.send_rps(opp_response, opp)
+        #
+        await manager.inform_opponent(rps, current_user.username)
         return RPS.make_response_from_db(rps, current_user.username)
-        # return {
-        #     "code": "success",
-        #     "message": f"created new RPS game#{rps.id},  {current_user.username} vs {opponent}, first to {rps.goal}"
-        # }
     else:
         raise HTTPException(status_code=400, detail="opponent not found, or something else went wrong")
 
