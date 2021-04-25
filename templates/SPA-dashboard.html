@@ -43,7 +43,6 @@
                 console.log("cant even get games.")
                 logout()
             }
-
         });
     }
 
@@ -387,6 +386,7 @@
             success: function () {
                 console.log("fetching recent messages")
                 let msg_list = document.getElementById("list-messages")
+                msg_list.innerHTML = ""
                 const messages = mymessagesGET.responseJSON
                 let max = messages.length - 5;
                 if (max < 0)

@@ -48,7 +48,7 @@
 </div>
 
 <div id="modal-invalidpw" class="ui mini modal">
-    <div class="header">Login failed</div>
+    <div class="header">Login Failed</div>
     <div class="content">
         Invalid password
     </div>
@@ -98,12 +98,103 @@
     </div>
 </div>
 
+<div id="modal-choose-avatar" class="ui tiny modal">
+    <div class="header">Choose your avatar</div>
+    <p style="margin-bottom:10px;"></p>
+    <div class = "content">
+        <div class = "ui form three column center aligned grid" id="list-default-avatars">
+
+        </div>
+    </div>
+    <p style="margin-bottom:10px;"></p>
+    <div class="actions">
+        <button class="ui secondary button deny" onclick=""> Cancel </button>
+        <button class="ui positive button deny" onclick="set_avatar()"> Confirm </button>
+    </div>
+</div>
+
+<style>
+    .avatar {
+      vertical-align: middle;
+      width: 50px;
+      height: 50px;
+      border-radius: 5px 5px;
+    }
+</style>
+
+<style>
+    [type=radio] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    /* IMAGE STYLES */
+    [type=radio] + img {
+        cursor: pointer;
+    }
+
+    /* CHECKED STYLES */
+    [type=radio]:checked + img {
+        border: 1px solid #fff;
+        box-shadow: 0 0 3px 3px #090;
+    }
+</style>
 
 <script>
 
-    // TODO avatar waehlen zB
-    function account(){
-        console.log("account settings i guess")
+    function account() {
+        const token = window.localStorage.getItem("RPAtoken")
+        const response = $.ajax({
+            url: "/get_default_avatars/",
+            type: "GET",
+
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                var default_avatars = document.getElementById("list-default-avatars")
+                default_avatars.innerHTML = ""
+                $('#modal-choose-avatar').modal("show");
+
+                response.responseJSON["default_avatars"].forEach(
+                    avatar_name => {
+                        var is_checked = ""
+                        if (avatar_name == response.responseJSON["player_avatar"]) {
+                            is_checked = 'checked = "checked"'
+                        }
+                        default_avatar_HTML =
+                            '<div class="column"><div class="field"><div class="ui radio">' +
+                            '<label><input type="radio" name="default_avatar_selector" value = "' + avatar_name + '"'+ is_checked +'"><' +
+                            'img src="avatar/' + avatar_name + '"class = "avatar" alt="Avatar"></label></div></div></div>'
+                        default_avatars.innerHTML += default_avatar_HTML
+                    }
+                )
+            },
+            error: function () {
+                console.log(send.responseJSON)
+            }
+        });
+    }
+
+    function set_avatar() {
+        var avatar_name = $("input[type='radio'][name='default_avatar_selector']:checked").val();
+        const token = window.localStorage.getItem("RPAtoken")
+        $.ajax({
+            url: "/myavatar/" + avatar_name,
+            type: "PUT",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                console.log("Chose avatar: " + avatar_name + " in account settings.")
+                getMyRecentMessages()
+            },
+            error: function () {
+                console.log(send.responseJSON)
+            }
+        })
     }
 
 

@@ -189,6 +189,19 @@ async def send_message(outgoing: OutgoingMessage, current_user: UserPydantic = D
     message_request = MessageRequest(sender_id=sender_id, recipient_id=recipient.id, content=outgoing.content)
     create_message(message_request, db)
 
+@app.get("/get_default_avatars/")
+async def get_default_avatars(current_user: UserPydantic = Depends(get_current_user)):
+    default_avatars = ["ashe", "lilia", "lucian", "neeko", "yone", "zac"]
+    player_avatar = current_user.avatar
+
+    print(f"Default avatars: {default_avatars}")
+    print(f"Player avatar: {player_avatar}")
+    return {
+        "code": "success",
+        "default_avatars": default_avatars,
+        "player_avatar": player_avatar
+    }
+
 
 # sets the current users avatar
 @app.put("/myavatar/{name}")
