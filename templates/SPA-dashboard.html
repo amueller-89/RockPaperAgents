@@ -5,6 +5,7 @@
 
     let loggedIn    //are these useful?
     let username
+    let websocket
 
     let gameCreateButtons = []
     let gameColors = []
@@ -65,7 +66,7 @@
                 document.getElementById("div-logout-btn").style.display = ""
                 document.getElementById("btn-newmessage").classList.remove("disabled")
 
-
+                connect_websocket()
                 getMyRecentMessages()
                 getMyGames()
                 gameCreateButtons.forEach(enable_create_button);
@@ -83,16 +84,37 @@
         document.getElementById("div-login-bar").style.display = "block"
         document.getElementById("list-messages").innerHTML = ""
         document.getElementById("list-current-games").innerHTML = ""
+        document.getElementById("list-finished-games").innerHTML = ""
         document.getElementById("btn-newmessage").classList.add("disabled")
         document.getElementById("name").value = ""
         document.getElementById("password").value = ""
-        // TODO disable create buttons
+        document.getElementById("field-rps-opp").classList.remove('error')
+        document.getElementById("input-rps-opp").value = ""
+        document.getElementById("input-rps-message").value = ""
         //console.log(gameCreateButtons)
         gameCreateButtons.forEach(disable_create_button);
+
 
         username = ""
         loggedIn = false
         fetchedGames = {}
+        if (websocket)
+            websocket.close()
+    }
+
+    function connect_websocket() {
+        websocket = new WebSocket('ws://localhost:8000/ws/' + username)
+        websocket.onmessage = function (event) {
+            console.log("websocket received:")
+            let json = JSON.parse(JSON.parse(event.data))
+            console.log(json)
+            fetchedGames[json.id] = json
+            if (rps_id == json.id) {
+                configure_rps_view(rps_id)
+            }
+            drawMyCurrentGames()
+            drawMyFinishedGames()
+        }
     }
 
 
@@ -110,7 +132,7 @@
                     border += "red"
                 }
                 let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
-                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">vs. '
+                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#'+game.id +' vs. '
                     + game["opponent"]
                     + '</div></div></div>'
 
@@ -134,7 +156,7 @@
                     border += "red"
                 }
                 let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
-                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">vs. '
+                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#'+ game.id+' vs. '
                     + game["opponent"]
                     + '</div></div></div>'
 
@@ -201,9 +223,14 @@
             data: JSON.stringify({"game_id": rps_id, "move": rps_move}),
             dataType: 'json',
             success: function () {
-                console.log("success committing move")
-                get_rps(rps_id)
-
+                console.log("success committing move, response:")
+                console.log(play.responseJSON)
+                let game = play.responseJSON
+                fetchedGames[game.id] = game
+                configure_rps_view(game.id)
+                //get_rps(rps_id)
+                drawMyCurrentGames()
+                drawMyFinishedGames()
 
             },
             error: function () {
@@ -214,7 +241,7 @@
 
     }
 
-    //TODO
+
     function create(game) {
         console.log("create ", game)
         if (game == "Rock Paper Scissors") {
@@ -223,19 +250,57 @@
     }
 
 
+    function createRPS() {
+        const opponent = document.getElementById("input-rps-opp").value
+        let goal = $('#rps-new-dropdown').dropdown('get value');
+        if (!goal) {
+            goal = 3
+        }
+        //console.log("new rps" + opponent+ " "+ goal)
+        const token = window.localStorage.getItem("RPAtoken")
+        const createRPS = $.ajax({
+            url: "/createRPS/" + opponent + "/" + goal,
+            type: "POST",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                console.log("created new rps " + opponent + " " + goal)
+                document.getElementById("field-rps-opp").classList.remove('error')
+                document.getElementById("input-rps-opp").value = ""
+                document.getElementById("input-rps-message").value = ""
+                $('#rps-new-dropdown').dropdown('get value')
+                let game = createRPS.responseJSON
+                fetchedGames[game.id] = game
+                drawMyCurrentGames()
+                drawMyFinishedGames()
+                //getMyGames()
+                $('#modal-newrps').modal('hide').modal('hide dimmer');
+
+            },
+            error: function () {
+                //  general error handling ala oops something went wrong
+                console.log(createRPS.responseJSON)
+                document.getElementById("field-rps-opp").classList.add('error')
+                //document.getElementById("input-recipient").setAttribute("data-content", "popup")
+            }
+        });
+
+    }
+
+
     function configure_rps_view(id) {
         // from prefetched data!
         document.getElementById("rps-opponent").innerHTML = ""
         document.getElementById("rps-me").innerHTML = ""
         document.getElementById("rps-score").innerHTML = ""
-        rps_id = id
+
         rps_move = -1
         document.getElementById('btn-shoot').classList.add('disabled')
         document.getElementById('btn-shoot').innerHTML = "Shoot"
         //cleanup
 
         let game = fetchedGames[id]
-        console.log(game)
         if (game.finished) {
             document.getElementById("rps-resign-div").style.display = "none"
             if (game.my_score == game.goal) {
@@ -297,14 +362,14 @@
         }
         document.getElementById("rps-score").innerHTML += scoreHTML
         document.getElementById("rps-info").innerHTML = "RPS game #" + game.id
-        if(game.last_activity){
+        if (game.last_activity) {
             document.getElementById("rps-info").innerHTML += "<br>last active: " + dateConvert(game.last_activity)
         }
         document.getElementById("rps-info").innerHTML += "<br>created: " + dateConvert(game.date_created)
     }
 
     function showRPS(id) {
-        // should this update?
+        rps_id = id
         console.log("show rps# " + id)
         configure_rps_view(id)
         $('#modal-RPS').modal('show')
@@ -418,30 +483,33 @@
         return prettyDate
     }
 
+    $(document).ready(function () {
+        console.log(">>>>>>>>> ready")
+        $('.ui.dropdown')
+            .dropdown()
+        ;
+    })
 
 </script>
 
-<h2>Dashboard </h2>
-
-<hr>
+<h2></h2>
 
 <div class="ui grid">
     <div class="left floated four wide column">
-        <h3 class="ui dividing header">create game</h3>
+        <h3 class="ui dividing header">Create game</h3>
         <div class="ui list" id="list-games">
         </div>
-
     </div>
 
 
     <div class="four wide column">
-        <h3 class="ui dividing header">your current games</h3>
+        <h3 class="ui dividing header">Your current games</h3>
         <div class="ui list" id="list-current-games">
         </div>
     </div>
 
     <div class="four wide column">
-        <h3 class="ui dividing header">recently finished games</h3>
+        <h3 class="ui dividing header">Recently finished games</h3>
         <div class="ui list" id="list-finished-games">
         </div>
     </div>
@@ -505,7 +573,6 @@
 <div id="modal-newrps" class="ui tiny modal">
     <i class="close icon"></i>
     <div class="header">Choose opponent</div>
-
     <div class="content">
         <form class="ui form">
             <div class="field" id="field-rps-opp">
@@ -517,7 +584,7 @@
         </form>
     </div>
     <div class="actions">
-        <div class="ui dropdown">
+        <div class="ui dropdown" id="rps-new-dropdown">
             <div class="text">First to...</div>
             <i class="dropdown icon"></i>
             <div class="menu">
@@ -532,7 +599,7 @@
                 <div class="item">9</div>
             </div>
         </div>
-        <button class="ui labeled icon primary button" id="btn-rps-send" onclick="">
+        <button class="ui labeled icon primary button" id="btn-rps-send" onclick="createRPS()">
             <i class="paper plane outline icon"></i>
             post challenge
         </button>

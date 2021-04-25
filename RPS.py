@@ -65,6 +65,9 @@ def make_response_from_db(game: RockPaperScissorsDB, my_name: str):
 
 ##### database utilities
 def create_game(rps_request: Game_Request, db: Session):
+    if not rps_request:
+        print("im not creating from null")
+        return None
     user1 = db.query(UserDB).filter(UserDB.username == rps_request.player1).one_or_none()
     user2 = db.query(UserDB).filter(UserDB.username == rps_request.player2).one_or_none()
     if not (user1 and user2):
@@ -135,3 +138,7 @@ def update(game: RockPaperScissorsDB, db: Session):
 
 def getGames(user: UserDB, db: Session):
     return db.query(RockPaperScissorsDB).join(RPS_PlayerDB).filter(RPS_PlayerDB.user == user)
+
+
+def external_update():
+    pass
