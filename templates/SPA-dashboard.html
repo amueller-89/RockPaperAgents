@@ -3,258 +3,513 @@
 {%block dashboard%}
 <script>
 
-let loggedIn    //are these usefuL?
-let username
-let gameCreateButtons = []
-let gameColors = []
+    let loggedIn    //are these useful?
+    let username
+    let websocket
+
+    let gameCreateButtons = []
+    let gameColors = []
+
+    let fetchedGames = {}       // array of Game_Responses
+
+    let rps_move = -1
+    let rps_id
+
+    initialize()
+
+    function initialize() {
+        const allGamesGET = $.ajax({
+            url: "/games",
+            type: "GET",
+            success: function () {
+                let games = allGamesGET.responseJSON
+                let games_list = document.getElementById("list-games");
+                for (var i = 0; i < games.length; i++) {
+                    const x = games[i][0]
+                    if (games[i][2] == true) {
+                        gameCreateButtons.push(x)
+                        gameColors.push(games[i][1])
+                    }
+                    var btnHTML = '<div class="item"><button id="btn-' + x + '" class="ui ' + games[i][1]
+                        + ' disabled button" style="opacity: 1;" onclick="create(\'' + x + '\')">' + x
+                        + '</button></div>'
+                    games_list.innerHTML += btnHTML
 
 
-getGames()
-authorize()
-
-
-function getGames() {
-    const allGamesGET = $.ajax({
-        url: "/games",
-        type: "GET",
-        success: function () {
-            let games = allGamesGET.responseJSON
-            let games_list = document.getElementById("list-games");
-            for (var i = 0; i < games.length; i++) {
-                const x = games[i][0]
-                if (games[i][2] == true) {
-                    gameCreateButtons.push(x)
-                    gameColors.push(games[i][1])
                 }
-                var btnHTML = '<div class="item"><button id="btn-' + x + '" class="ui ' + games[i][1]
-                    + ' disabled button" style="opacity: 1;" onclick="create(\'' + x + '\')">' + x
-                    + '</button></div>'
-                games_list.innerHTML += btnHTML
+                authorize()
+            },
+            error: function () {
+                console.log("cant even get games.")
+                logout()
             }
-        },
-        error: function () {
-            console.log("cant even get games.")
-            logout()
+        });
+    }
+
+
+    function authorize() {
+        console.log("authorize called")
+        const token = window.localStorage.getItem("RPAtoken")
+        const user = $.ajax({
+            url: "/me",
+            type: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                console.log("authorized, hiding loginbar, showing logout button")
+                loggedIn = true
+                document.getElementById("div-login-bar").style.display = "none"
+                username = user.responseJSON["username"]
+                document.getElementById('label-logout').innerHTML = "<i class=\"icon user\"></i>" + username
+                document.getElementById("div-logout-btn").style.display = ""
+                document.getElementById("btn-newmessage").classList.remove("disabled")
+
+                connect_websocket()
+                getMyRecentMessages()
+                getMyGames()
+                gameCreateButtons.forEach(enable_create_button);
+            },
+            error: function () {
+                console.log("no authorization")
+                logout()
+            }
+        });
+    }
+
+    function logout() {
+        window.localStorage.removeItem("RPAtoken")
+        document.getElementById("div-logout-btn").style.display = "none"
+        document.getElementById("div-login-bar").style.display = "block"
+        document.getElementById("list-messages").innerHTML = ""
+        document.getElementById("list-current-games").innerHTML = ""
+        document.getElementById("list-finished-games").innerHTML = ""
+        document.getElementById("btn-newmessage").classList.add("disabled")
+        document.getElementById("name").value = ""
+        document.getElementById("password").value = ""
+        document.getElementById("field-rps-opp").classList.remove('error')
+        document.getElementById("input-rps-opp").value = ""
+        document.getElementById("input-rps-message").value = ""
+        //console.log(gameCreateButtons)
+        gameCreateButtons.forEach(disable_create_button);
+
+
+        username = ""
+        loggedIn = false
+        fetchedGames = {}
+        if (websocket)
+            websocket.close()
+    }
+
+    function connect_websocket() {
+        websocket = new WebSocket('ws://localhost:8000/ws/' + username)
+        websocket.onmessage = function (event) {
+            console.log("websocket received:")
+            let json = JSON.parse(JSON.parse(event.data))
+            console.log(json)
+            fetchedGames[json.id] = json
+            if (rps_id == json.id) {
+                configure_rps_view(rps_id)
+            }
+            drawMyCurrentGames()
+            drawMyFinishedGames()
         }
-
-    });
-}
-
-function logout() {
-    window.localStorage.removeItem("RPAtoken")
-    document.getElementById("div-logout-btn").style.display = "none"
-    document.getElementById("div-login-bar").style.display = "block"
-    document.getElementById("list-messages").innerHTML = ""
-    document.getElementById("list-current-games").innerHTML = ""
-    document.getElementById("btn-newmessage").classList.add("disabled")
-    document.getElementById("btn-newmessage").classList.add("disabled")
-    document.getElementById("name").value = ""
-    document.getElementById("password").value = ""
-    // TODO disable create buttons
-    console.log(gameCreateButtons)
-    gameCreateButtons.forEach(disable_create_button);
-
-    username = ""
-    loggedIn = false
-}
+    }
 
 
-function authorize() {
-    const token = window.localStorage.getItem("RPAtoken")
-    const user = $.ajax({
-        url: "/me",
-        type: "GET",
-        beforeSend: function (xhr) {
-            xhr.setRequestHeader('Authorization', "Bearer " + token);
-        },
-        success: function () {
-            console.log("authorized, hiding loginbar, showing logout button")
-            loggedIn = true
-            document.getElementById("div-login-bar").style.display = "none"
-            username = user.responseJSON["username"]
-            document.getElementById('label-logout').innerHTML = "<i class=\"icon user\"></i>" + username
-            document.getElementById("div-logout-btn").style.display = ""
-            document.getElementById("btn-newmessage").classList.remove("disabled")
-
-            // TODO enable create button
-            getMyRecentMessages()
-            getMyCurrentGames()
-            gameCreateButtons.forEach(enable_create_button);
-        },
-        error: function () {
-            console.log("no authorization")
-            logout()
-        }
-    });
-}
-
-
-function getMyCurrentGames() {
-    const token = window.localStorage.getItem("RPAtoken")
-    const myGamesGET = $.ajax({
-        url: "/myCurrentGames",
-        type: "GET",
-        beforeSend: function (xhr) {
-            xhr.setRequestHeader('Authorization', "Bearer " + token);
-        },
-        success: function () { //save this someplace
-            let games = myGamesGET.responseJSON
-            console.log(games)
-            let current_games_list = document.getElementById("list-current-games")
-            for (let i = 0; i < games.length; i++) {
-                btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label">'
-                    + games[i]["my_score"] + ' - ' + games[i]["opponent_score"] + '</a><div class="ui icon button" onclick="showGame(' + games[i]["id"] + ')">vs. '
-                    + games[i]["opponent"]
+    function drawMyCurrentGames() {
+        let current_games_list = document.getElementById("list-current-games")
+        current_games_list.innerHTML = ""
+        for (let id in fetchedGames) {
+            if (!fetchedGames[id].finished) {
+                let game = fetchedGames[id]
+                let border = ""
+                if (game["has_moved_me"]) {
+                    border += "green"
+                }
+                if (game["has_moved_opponent"]) {
+                    border += "red"
+                }
+                let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
+                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#'+game.id +' vs. '
+                    + game["opponent"]
                     + '</div></div></div>'
 
                 current_games_list.innerHTML += btnHTML
             }
-        },
-        error: function () {
-
         }
-    })
+    }
 
-}
+    function drawMyFinishedGames() {
+        let finished_games_list = document.getElementById("list-finished-games")
+        finished_games_list.innerHTML = ""
+        for (let id in fetchedGames) {
+            if (fetchedGames[id].finished) {
+                let game = fetchedGames[id]
+                let border = ""
 
-function getMyRecentMessages() {
-    const token = window.localStorage.getItem("RPAtoken")
-    const mymessagesGET = $.ajax({
-        url: "/myrecentmessages",
-        type: "GET",
-        beforeSend: function (xhr) {
-            xhr.setRequestHeader('Authorization', "Bearer " + token);
-        },
-        success: function () {
-            console.log("fetching recent messages")
-            let msg_list = document.getElementById("list-messages")
-            const messages = mymessagesGET.responseJSON
-            let max = messages.length - 5;
-            if (max < 0)
-                max = 0
-            for (let i = messages.length - 1; i >= max; i--) {
-                //await new Promise(r => setTimeout(r, 2000));
-                let current = messages[i]
-                let prettyDate = dateConvert(current["date"])
-                //TODO reply knopf mal mindestens
-
-                if (current["content"].length > 140) {
-                    current["content"] = current["content"].substr(0, 140)
-                    current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
+                if (game.goal == game.my_score) {
+                    border += "green"
                 }
+                if (game.goal == game.opponent_score) {
+                    border += "red"
+                }
+                let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
+                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#'+ game.id+' vs. '
+                    + game["opponent"]
+                    + '</div></div></div>'
 
-                var msgHTML = '<div class="comment"><a class="avatar">\n' +
-                    '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
-                    '                    </a><div class="content">\n' +
-                    '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
-                    '                            <span class="date">' + prettyDate + '</span>\n' +
-                    '                        </div><div class="text">' + current["content"] + '</div><div class="actions" onclick="reply(\'' + current["sender"] + '\')">\n' +
-                    '                            <a class="reply">Reply</a>\n' +
-                    '                        </div></div>'
-                msg_list.innerHTML += msgHTML
+                finished_games_list.innerHTML += btnHTML
             }
         }
+    }
 
-    });
-}
+    function getMyGames() {
+        const token = window.localStorage.getItem("RPAtoken")
+        const myGamesGET = $.ajax({
+            url: "/myGames",
+            type: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                let gamesJSON = myGamesGET.responseJSON
+                for (let i in gamesJSON) {
+                    fetchedGames[gamesJSON[i]["id"]] = gamesJSON[i]
+                }
+                drawMyCurrentGames()
+                drawMyFinishedGames()
+            },
+            error: function () {
+            }
+        })
 
-function disable_create_button(game) {
-    console.log("disabling " + game)
-    document.getElementById("btn-" + game).classList.add("disabled")
-}
-
-function enable_create_button(game) {
-    console.log("enable " + game)
-    document.getElementById("btn-" + game).classList.remove("disabled")
-}
+    }
 
 
-function showGame(id) {
-    console.log("showgame " + id)
-}
+    function get_rps(rps_id) {
+        const token = window.localStorage.getItem("RPAtoken")
+        const rpsGET = $.ajax({
+            url: "/myrps",
+            type: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            data: {"id": rps_id},
+            success: function () {
+                let responseJSON = rpsGET.responseJSON
+                fetchedGames[rps_id] = responseJSON
+                configure_rps_view(rps_id)
+                drawMyCurrentGames()
+                drawMyFinishedGames()
+            },
+            error: function () {
 
-function reply(name) {
-    document.getElementById("field-recipient").classList.remove('error')
-    document.getElementById("input-recipient").value = name
-    document.getElementById("input-message").value = ""
-    $('#modal-newmessage').modal('show')
-    $("#input-message").focus(); // TODO after this is executed, focus jumps back to the recipient field. why?
-}
+            }
+        })
+    }
 
-function dateConvert(datetime) {
-    //TODO wie machen echte leute das?
-    //console.log(datetime)
-    let prettyDate = ""
-    for (let i = 11; i < 16; i++)
-        prettyDate += datetime[i]
-    prettyDate += " on "
-    prettyDate += datetime[5]
-    prettyDate += datetime[6]
-    prettyDate += "/"
-    prettyDate += datetime[8]
-    prettyDate += datetime[9]
-    prettyDate += "/"
-    prettyDate += datetime[2]
-    prettyDate += datetime[3]
-    return prettyDate
-}
+    function play_rps() {
+        console.log("playing " + rps_move + " in game#" + rps_id)
+        const token = window.localStorage.getItem("RPAtoken")
+        const play = $.ajax({
+            url: "/playRPS/",
+            type: "put",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({"game_id": rps_id, "move": rps_move}),
+            dataType: 'json',
+            success: function () {
+                console.log("success committing move, response:")
+                console.log(play.responseJSON)
+                let game = play.responseJSON
+                fetchedGames[game.id] = game
+                configure_rps_view(game.id)
+                //get_rps(rps_id)
+                drawMyCurrentGames()
+                drawMyFinishedGames()
 
-//TODO
-function create(game) {
-    console.log("create ", game)
-}
+            },
+            error: function () {
+                //  general error handling ala oops something went wrong
+                console.log(play.responseJSON)
+            }
+        });
 
-function send() {
-    const recipient = document.getElementById("input-recipient").value
-    const content = document.getElementById("input-message").value
-    const token = window.localStorage.getItem("RPAtoken")
-    const send = $.ajax({
-        url: "/send/",
-        type: "POST",
-        beforeSend: function (xhr) {
-            xhr.setRequestHeader('Authorization', "Bearer " + token);
-        },
-        contentType: 'application/json',
-        data: JSON.stringify({"recipient": recipient, "content": content}),
-        dataType: 'json',
-        success: function () {
-            console.log("sent successfully")
-            document.getElementById("field-recipient").classList.remove('error')
-            document.getElementById("input-recipient").value = ""
-            document.getElementById("input-message").value = ""
-            $('#modal-newmessage').modal('hide').modal('hide dimmer');
-        },
-        error: function () {
-            // TODO hier koennte irgendwas anderes schiefgehen?
-            //  generelle fehlermeldung ala oops smth went wrong
-            console.log(send.responseJSON)
-            document.getElementById("field-recipient").classList.add('error')
-            //document.getElementById("input-recipient").setAttribute("data-content", "popup")
+    }
+
+
+    function create(game) {
+        console.log("create ", game)
+        if (game == "Rock Paper Scissors") {
+            $('#modal-newrps').modal('show')
         }
-    });
-}
+    }
+
+
+    function createRPS() {
+        const opponent = document.getElementById("input-rps-opp").value
+        let goal = $('#rps-new-dropdown').dropdown('get value');
+        if (!goal) {
+            goal = 3
+        }
+        //console.log("new rps" + opponent+ " "+ goal)
+        const token = window.localStorage.getItem("RPAtoken")
+        const createRPS = $.ajax({
+            url: "/createRPS/" + opponent + "/" + goal,
+            type: "POST",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                console.log("created new rps " + opponent + " " + goal)
+                document.getElementById("field-rps-opp").classList.remove('error')
+                document.getElementById("input-rps-opp").value = ""
+                document.getElementById("input-rps-message").value = ""
+                $('#rps-new-dropdown').dropdown('get value')
+                let game = createRPS.responseJSON
+                fetchedGames[game.id] = game
+                drawMyCurrentGames()
+                drawMyFinishedGames()
+                //getMyGames()
+                $('#modal-newrps').modal('hide').modal('hide dimmer');
+
+            },
+            error: function () {
+                //  general error handling ala oops something went wrong
+                console.log(createRPS.responseJSON)
+                document.getElementById("field-rps-opp").classList.add('error')
+                //document.getElementById("input-recipient").setAttribute("data-content", "popup")
+            }
+        });
+
+    }
+
+
+    function configure_rps_view(id) {
+        // from prefetched data!
+        document.getElementById("rps-opponent").innerHTML = ""
+        document.getElementById("rps-me").innerHTML = ""
+        document.getElementById("rps-score").innerHTML = ""
+
+        rps_move = -1
+        document.getElementById('btn-shoot').classList.add('disabled')
+        document.getElementById('btn-shoot').innerHTML = "Shoot"
+        //cleanup
+
+        let game = fetchedGames[id]
+        if (game.finished) {
+            document.getElementById("rps-resign-div").style.display = "none"
+            if (game.my_score == game.goal) {
+                document.getElementById("rps-finished").innerHTML = '<img src="games/victory" alt="" width="300" height="auto">'
+            } else {
+                document.getElementById("rps-finished").innerHTML = '<img src="games/defeat" alt="" width="350" height="auto">'
+            }
+            document.getElementById("rps-finished").style.display = "block"
+            document.getElementById("rps-grid").style.display = "none"
+
+        } else {
+            document.getElementById("rps-resign-div").style.display = "block"
+            document.getElementById("rps-finished").style.display = "none"
+            document.getElementById("rps-grid").style.display = "block"
+
+            if (!game["has_moved_opponent"]) {
+                document.getElementById('btn-shoot-opp').classList.add('loading')
+            } else {
+                document.getElementById('btn-shoot-opp').classList.remove('loading')
+            }
+
+            if (game["has_moved_me"]) {
+                document.getElementById("btn-0").classList.add('disabled')
+                document.getElementById("btn-1").classList.add('disabled')
+                document.getElementById("btn-2").classList.add('disabled')
+                document.getElementById('btn-shoot').innerHTML = '<i class=\"check icon\"></i>'
+            } else {
+                document.getElementById("btn-0").classList.remove('disabled')
+                document.getElementById("btn-1").classList.remove('disabled')
+                document.getElementById("btn-2").classList.remove('disabled')
+            }
+
+        }
+
+
+        const meHTML = '<img src="avatar/' + game["my_avatar"] + '" alt=""> <text>&nbsp; ' + game["me"] + '</text>'
+        document.getElementById("rps-me").innerHTML += meHTML
+
+        const oppHTML = '<text>&nbsp; ' + game["opponent"] + '</text> <img src="avatar/' + game["opponent_avatar"] + '" alt=""> '
+        document.getElementById("rps-opponent").innerHTML += oppHTML
+
+        let scoreHTML = ''
+        if (game["goal"] < 9) {
+            for (let i = 0; i < game["goal"] + game["goal"] - 1; i++) {
+                if (i < game["my_score"]) {
+                    scoreHTML += '<button class="ui circular huge green icon button"> </button>'
+                } else if (i >= 2 * game["goal"] - game["opponent_score"] - 1) {
+                    scoreHTML += '<button class="ui circular huge red icon button"> </button>'
+                } else if (i == game["goal"] - 1) {
+                    scoreHTML += '<button class="ui circular huge black basic icon button"> <i class="icon trophy"></i>' +
+                        '</button>'
+                } else {
+                    scoreHTML += '<button class="ui circular huge black basic icon button"> </button>'
+                }
+
+            }
+        } else {
+            scoreHTML += game["my_score"] + " - " + game["opponent_score"] + "<br>first to " + game.goal
+        }
+        document.getElementById("rps-score").innerHTML += scoreHTML
+        document.getElementById("rps-info").innerHTML = "RPS game #" + game.id
+        if (game.last_activity) {
+            document.getElementById("rps-info").innerHTML += "<br>last active: " + dateConvert(game.last_activity)
+        }
+        document.getElementById("rps-info").innerHTML += "<br>created: " + dateConvert(game.date_created)
+    }
+
+    function showRPS(id) {
+        rps_id = id
+        console.log("show rps# " + id)
+        configure_rps_view(id)
+        $('#modal-RPS').modal('show')
+    }
+
+
+    function getMyRecentMessages() {
+        const token = window.localStorage.getItem("RPAtoken")
+        const mymessagesGET = $.ajax({
+            url: "/myrecentmessages",
+            type: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            success: function () {
+                console.log("fetching recent messages")
+                let msg_list = document.getElementById("list-messages")
+                const messages = mymessagesGET.responseJSON
+                let max = messages.length - 5;
+                if (max < 0)
+                    max = 0
+                for (let i = messages.length - 1; i >= max; i--) {
+                    //await new Promise(r => setTimeout(r, 2000));
+                    let current = messages[i]
+                    let prettyDate = dateConvert(current["date"])
+
+                    if (current["content"].length > 140) {
+                        current["content"] = current["content"].substr(0, 140)
+                        current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
+                    }
+
+                    var msgHTML = '<div class="comment"><a class="avatar">\n' +
+                        '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
+                        '                    </a><div class="content">\n' +
+                        '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
+                        '                            <span class="date">' + prettyDate + '</span>\n' +
+                        '                        </div><div class="text">' + current["content"] + '</div><div class="actions" onclick="reply(\'' + current["sender"] + '\')">\n' +
+                        '                            <a class="reply">Reply</a>\n' +
+                        '                        </div></div>'
+                    msg_list.innerHTML += msgHTML
+                }
+            }
+
+        });
+
+    }
+
+    function reply(name) {
+        document.getElementById("field-recipient").classList.remove('error')
+        document.getElementById("input-recipient").value = name
+        document.getElementById("input-message").value = ""
+        $('#modal-newmessage').modal('show')
+        $("#input-message").focus(); // TODO after this is executed, focus jumps back to the recipient field. why?
+    }
+
+    function send() {
+        const recipient = document.getElementById("input-recipient").value
+        const content = document.getElementById("input-message").value
+        const token = window.localStorage.getItem("RPAtoken")
+        const send = $.ajax({
+            url: "/send/",
+            type: "POST",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({"recipient": recipient, "content": content}),
+            dataType: 'json',
+            success: function () {
+                console.log("sent successfully")
+                document.getElementById("field-recipient").classList.remove('error')
+                document.getElementById("input-recipient").value = ""
+                document.getElementById("input-message").value = ""
+                $('#modal-newmessage').modal('hide').modal('hide dimmer');
+            },
+            error: function () {
+                //  general error handling ala oops something went wrong
+                console.log(send.responseJSON)
+                document.getElementById("field-recipient").classList.add('error')
+                //document.getElementById("input-recipient").setAttribute("data-content", "popup")
+            }
+        });
+    }
+
+
+    function disable_create_button(game) {
+        console.log("disabling " + game)
+        document.getElementById("btn-" + game).classList.add("disabled")
+    }
+
+    function enable_create_button(game) {
+        console.log("enable " + game)
+        document.getElementById("btn-" + game).classList.remove("disabled")
+    }
+
+
+    function dateConvert(datetime) {
+        //console.log(datetime)
+        let prettyDate = ""
+        for (let i = 11; i < 16; i++)
+            prettyDate += datetime[i]
+        prettyDate += " on "
+        prettyDate += datetime[5]
+        prettyDate += datetime[6]
+        prettyDate += "/"
+        prettyDate += datetime[8]
+        prettyDate += datetime[9]
+        prettyDate += "/"
+        prettyDate += datetime[2]
+        prettyDate += datetime[3]
+        return prettyDate
+    }
+
+    $(document).ready(function () {
+        console.log(">>>>>>>>> ready")
+        $('.ui.dropdown')
+            .dropdown()
+        ;
+    })
 
 </script>
 
-<h2>Dashboard </h2>
-
-<hr>
+<h2></h2>
 
 <div class="ui grid">
     <div class="left floated four wide column">
-        <h3 class="ui dividing header">create game</h3>
+        <h3 class="ui dividing header">Create game</h3>
         <div class="ui list" id="list-games">
         </div>
-
     </div>
 
-    <div class="four wide column">
-        <h3 class="ui dividing header">open challenges</h3>
-    </div>
 
     <div class="four wide column">
-        <h3 class="ui dividing header">your current games</h3>
+        <h3 class="ui dividing header">Your current games</h3>
         <div class="ui list" id="list-current-games">
+        </div>
+    </div>
+
+    <div class="four wide column">
+        <h3 class="ui dividing header">Recently finished games</h3>
+        <div class="ui list" id="list-finished-games">
         </div>
     </div>
 
@@ -313,4 +568,218 @@ function send() {
     </div>
 </div>
 
+
+<div id="modal-newrps" class="ui tiny modal">
+    <i class="close icon"></i>
+    <div class="header">Choose opponent</div>
+    <div class="content">
+        <form class="ui form">
+            <div class="field" id="field-rps-opp">
+                <input type="text" id="input-rps-opp" placeholder="Opponent">
+            </div>
+            <div class="field">
+                <textarea rows="4" placeholder="attach a message to your challenge!" id="input-rps-message"></textarea>
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui dropdown" id="rps-new-dropdown">
+            <div class="text">First to...</div>
+            <i class="dropdown icon"></i>
+            <div class="menu">
+                <div class="item">1</div>
+                <div class="item">2</div>
+                <div class="item">3</div>
+                <div class="item">4</div>
+                <div class="item">5</div>
+                <div class="item">6</div>
+                <div class="item">7</div>
+                <div class="item">8</div>
+                <div class="item">9</div>
+            </div>
+        </div>
+        <button class="ui labeled icon primary button" id="btn-rps-send" onclick="createRPS()">
+            <i class="paper plane outline icon"></i>
+            post challenge
+        </button>
+    </div>
+</div>
+
+
+<div id="modal-RPS" class="ui large modal">
+    <i class="close icon"></i>
+    <div class="header">
+        <div class="ui grid">
+            <div class="three wide column" id="rps-me">
+            </div>
+
+            <div class="center aligned ten wide column" id="rps-score">
+
+            </div>
+
+            <div class="right aligned three wide column" id="rps-opponent">
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="ui two columns divided grid" id="rps-grid">
+            <div class="row">
+                <div class="column">
+                    <div class="ui grid">
+                        <div class="row">
+                            <div class="center aligned column">
+                                <button class="ui button"
+                                        onclick="rps_move = 0; document.getElementById('btn-shoot').classList.remove('disabled')"
+                                        id="btn-0">
+                                    Rock
+                                </button>
+                                <button class="ui button"
+                                        onclick="rps_move = 1; document.getElementById('btn-shoot').classList.remove('disabled')"
+                                        id="btn-1">
+                                    Paper
+                                </button>
+                                <button class="ui button"
+                                        onclick="rps_move = 2; document.getElementById('btn-shoot').classList.remove('disabled')"
+                                        id="btn-2">
+                                    Scissors
+                                </button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="right aligned column">
+                                <button class="ui primary disabled button" id="btn-shoot" onclick="play_rps()"><i
+                                        class="check icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="ui grid">
+                        <div class="row">
+                            <div class="center aligned column">
+                                <button class="ui disabled button"> Rock</button>
+                                <button class="ui disabled button"> Paper</button>
+                                <button class="ui disabled button"> Scissors</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="left aligned column">
+                                <button class="ui primary disabled loading button" id="btn-shoot-opp"><i
+                                        class="check icon"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui center aligned container" id="rps-finished" style="display: none">
+        </div>
+
+    </div>
+    <div class="actions">
+        <div class="ui two columns grid">
+            <div class="left aligned column">
+                <div id="rps-resign-div">
+                    <button class="ui black deny button">
+                        resign
+                    </button>
+                    <div class="ui checkbox">
+                        <input type="checkbox" tabindex="0">
+                        <label>Yes, I'm sure</a></label>
+                    </div>
+                </div>
+            </div>
+            <div class="ui right aligned column">
+                <text style="font-size: smaller; color: grey" id="rps-info"></text>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="modal-RPS-proto" class="ui large modal">
+    <i class="close icon"></i>
+    <div class="header">
+        <div class="ui grid">
+            <div class="three wide column">
+                <img src="avatar/elliot" alt="">
+                <text>&nbsp; alex</text>
+            </div>
+
+            <div class="center aligned ten wide column">
+
+                <button class="ui circular huge green icon button">
+                </button>
+                <button class="ui circular huge black basic icon button">
+                </button>
+                <button class="ui circular  huge black basic icon button">
+                    <i class="icon trophy"></i>
+                </button>
+                <button class="ui circular huge red  icon button">
+                </button>
+                <button class="ui circular huge red icon button">
+                </button>
+
+            </div>
+
+            <div class="right aligned three wide column">
+                <text>martha &nbsp;</text>
+                <img src="avatar/jenny" alt="">
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="ui two columns divided grid">
+            <div class="row">
+                <div class="column">
+                    <div class="ui grid">
+                        <div class="row">
+                            <div class="center aligned column">
+                                <button class="ui toggle button"> Rock</button>
+                                <button class="ui toggle button"> Paper</button>
+                                <button class="ui toggle button"> Scissors</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="right aligned column">
+                                <button class="ui primary button"> Shoot</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="ui grid">
+                        <div class="row">
+                            <div class="center aligned column">
+                                <button class="ui disabled button"> Rock</button>
+                                <button class="ui disabled button"> Paper</button>
+                                <button class="ui disabled button"> Scissors</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="left aligned column">
+                                <button class="ui primary disabled button"> Shoot</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui left aligned container">
+            <button class="ui black deny button">
+                resign
+            </button>
+            <div class="ui checkbox" id="div-resign-checkbox">
+                <input type="checkbox" tabindex="0" id="input-resign">
+                <label id="text-resign">Yes, I'm sure</a></label>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock dashboard %}

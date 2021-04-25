@@ -3,7 +3,7 @@ from typing import Optional
 from jose import jwt, JWTError
 import random
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, WebSocket
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -12,7 +12,7 @@ from starlette import status
 from database import SessionLocal
 from models_pyd import MessageResponse, UserPydantic, RegisterRequest, MessageRequest
 import RPS
-from models_DB import UserDB, MessageDB, RPS_PlayerDB, RockPaperScissorsDB
+from models_DB import UserDB, MessageDB
 
 
 # populates the database with a bunch of user accounts and messages, RPS games and moves
@@ -68,7 +68,7 @@ def populate(db: Session):
     #     # sort by date created, oldest first
     #     martha_games = martha_games.order_by(RockPaperScissorsDB.date_created)
     #     game = martha_games.first()
-    #     print("marthas oldest unfinished is #", game.id)
+    #     print("martha's oldest unfinished is #", game.id)
     #
     #     # commit a random move for both of us, to a random game
     #     game = martha_games.all()[random.randint(0, len(martha_games.all()) - 1)]
@@ -76,6 +76,32 @@ def populate(db: Session):
     #     RPS.commit_move(move_request, db)
     #     move_request = RPS.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
     #     RPS.commit_move(move_request, db)
+
+
+# websocket stuff
+async def send_rps(message, websocket: WebSocket):
+    await websocket.send_text(message)
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections = {}
+
+    async def connect(self, websocket: WebSocket, username: str):
+        await websocket.accept()
+        self.active_connections[username] = websocket
+
+    def disconnect(self, username: str):
+        self.active_connections.pop(username)
+
+    def connections(self):
+        return [key for key in self.active_connections]
+
+    async def send_rps(self, response: RPS.Game_Response, opp: str):
+        if opp not in self.active_connections:
+            print("opp not online")
+            return
+        await self.active_connections[opp].send_json(response.json())
 
 
 # security settings and initializations

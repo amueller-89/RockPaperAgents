@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse
@@ -11,14 +11,15 @@ from sqlalchemy.orm import Session
 import RPS
 from utilities import ACCESS_TOKEN_EXPIRE_MINUTES, get_db, create_access_token, get_current_user, get
 from utilities import populate, verify_password, make_message_response_from_db
-from utilities import create_message, set_avatar, create_user
+from utilities import create_message, set_avatar, create_user, ConnectionManager
 from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest, GameType
 
 from database import engine
-from models_DB import UserDB, MessageDB, RockPaperScissorsDB, RPS_PlayerDB
+from models_DB import UserDB, MessageDB, RockPaperScissorsDB
 import models_DB
 
 app = FastAPI()
+manager = ConnectionManager()
 
 templates = Jinja2Templates(directory="templates")
 
@@ -42,6 +43,23 @@ def home(request: Request):
 @app.get("/terms")
 def terms(request: Request):
     return templates.TemplateResponse("terms.html", {"request": request})
+
+
+#### websocket endpoint
+@app.websocket("/ws/{username}")
+async def websocket(ws: WebSocket, username: str):
+    await manager.connect(ws, username)
+    print('currently online')
+    print(manager.connections())
+    try:
+        while True:
+            data = await ws.receive_text()
+            print(f"{username}s websocket received:")
+            print(data)
+    except WebSocketDisconnect:
+        manager.disconnect(username)
+        print("currently online")
+        print(manager.connections())
 
 
 ######## Registration/Authorization endpoints
@@ -103,10 +121,22 @@ def avatar(avatar_name):
     return FileResponse("images/avatar/" + avatar_name + ".jpg")
 
 
+# returns the victory splash
+@app.get("/games/victory")
+def victory_splash():
+    return FileResponse("images/games/victory.png")
+
+
+# returns the defeat splash
+@app.get("/games/defeat")
+def defeat_splash():
+    return FileResponse("images/games/defeat.png")
+
+
 # returns a list of available games
 @app.get("/games")
 def games_available():
-    print(games2)
+    # print(games2)
     return games
 
 
@@ -132,14 +162,19 @@ async def recent_incoming(limit: int = 5, current_user: UserPydantic = Depends(g
 
 # TODO probably this should have more query parameters like finished, unfinished, RPS/whatever else we might have...
 # error handling lol
-# returns the last {limit} active games of the current user
-@app.get("/myCurrentGames")
-async def recent_games(limit: int = 10, current_user: UserPydantic = Depends(get_current_user),
+# returns all active and the last {limit} finished games of the current user
+@app.get("/myGames")
+async def recent_games(limit: int = 5, current_user: UserPydantic = Depends(get_current_user),
                        db: Session = Depends(get_db)):
-    me = get(current_user.username, db)
-    games = RPS.getGames(me, db).filter(RockPaperScissorsDB.finished == False) \
+    me_db = get(current_user.username, db)
+
+    current_games = RPS.getGames(me_db, db).filter(RockPaperScissorsDB.finished == False) \
+        .order_by(RockPaperScissorsDB.last_activity.desc()).all()
+    finished_games = RPS.getGames(me_db, db).filter(RockPaperScissorsDB.finished == True) \
         .order_by(RockPaperScissorsDB.last_activity.desc()).limit(limit).all()
-    response = [RPS.make_response_from_db(game=game, my_name=me.username) for game in games]
+
+    response = [RPS.make_response_from_db(game=game, my_name=me_db.username) for game in
+                (current_games + finished_games)]
     return response
 
 
@@ -180,22 +215,43 @@ async def choose_avatar(name: str, current_user: UserPydantic = Depends(get_curr
     }
 
 
+@app.get("/myrps/")
+async def my_game_from_id(id: int, current_user: UserPydantic = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
+    game = db.query(RockPaperScissorsDB).filter(RockPaperScissorsDB.id == id).one_or_none()
+    if not game:
+        return f"rps#{id} not found"
+    players = [player.user.username for player in game.players]
+    if current_user.username not in players:
+        return "that's not your game buddy"
+    response = RPS.make_response_from_db(game=game, my_name=current_user.username)
+    return response
+
+
 @app.put("/playRPS/")
-async def playRPS(game: int, move: int,
+async def playRPS(move_request: RPS.Move_Request,
                   current_user: UserPydantic = Depends(get_current_user),
                   db: Session = Depends(get_db)):
-    move_request = RPS.Move_Request(move=move, user_id=get(current_user.username, db).id, game_id=game)
     if not move_request:
         return {
             "code": "error",
             "message": f"something went wrong creating the move request"
         }
+    move_request.user_id = get(current_user.username, db).id
     rps = RPS.commit_move(move_request, db)
     if rps:
-        return {
-            "code": "success",
-            "message": f"committed move {move} for RPS game#{rps.id} for  {current_user.username}"
-        }
+        print("preparing prod")
+        for p in rps.players:
+            if p.user.username != current_user.username:
+                opp = p.user.username
+                print("opponent: " + opp)
+        opp_response = RPS.make_response_from_db(game=rps, my_name=opp)
+        await manager.send_rps(opp_response, opp)
+        # return {
+        #     "code": "success",
+        #     "message": f"committed move {move_request.move} for RPS game#{rps.id} for  {current_user.username}"
+        # }
+        return RPS.make_response_from_db(game=rps, my_name=current_user.username)
     else:
         return {
             "code": "error",
@@ -203,22 +259,31 @@ async def playRPS(game: int, move: int,
         }
 
 
-@app.post("/createRPS/{opponent}")
-async def createRPS(opponent: str, goal: Optional[int] = None,
+@app.post("/createRPS/{opponent}/{goal}")
+async def createRPS(opponent: str, goal: int,
                     current_user: UserPydantic = Depends(get_current_user),
                     db: Session = Depends(get_db)):
+    print('new rps ' + current_user.username + ' vs ' + opponent + ', goal ' + str(goal))
+    if current_user.username == opponent:
+        raise HTTPException(status_code=400, detail="You cannot create games against yourself")
     game_request = RPS.Game_Request(player1=current_user.username, player2=opponent, goal=goal)
     rps = RPS.create_game(game_request, db)
     if rps:
-        return {
-            "code": "success",
-            "message": f"created new RPS game#{rps.id},  {current_user.username} vs {opponent}, first to {rps.goal}"
-        }
+        if rps:
+            print("preparing prod for new game")
+            for p in rps.players:
+                if p.user.username != current_user.username:
+                    opp = p.user.username
+                    print("vs opponent: " + opp)
+            opp_response = RPS.make_response_from_db(game=rps, my_name=opp)
+            await manager.send_rps(opp_response, opp)
+        return RPS.make_response_from_db(rps, current_user.username)
+        # return {
+        #     "code": "success",
+        #     "message": f"created new RPS game#{rps.id},  {current_user.username} vs {opponent}, first to {rps.goal}"
+        # }
     else:
-        return {
-            "code": "error",
-            "message": f"something went wrong"
-        }
+        raise HTTPException(status_code=400, detail="opponent not found, or something else went wrong")
 
 
 #######################################

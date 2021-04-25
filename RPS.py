@@ -16,7 +16,7 @@ class Game_Request(BaseModel):
 
 class Move_Request(BaseModel):
     move: int
-    user_id: int
+    user_id: Optional[int]
     game_id: int
 
 
@@ -26,9 +26,13 @@ class Game_Response(BaseModel):
     opponent: str
     goal: int
     my_score: int
+    my_avatar: str
     opponent_score: int
+    opponent_avatar: str
+    has_moved_opponent: bool
+    has_moved_me: bool
     date_created: datetime
-    last_activity: datetime
+    last_activity: Optional[datetime]
     finished: bool
 
 
@@ -38,14 +42,22 @@ def make_response_from_db(game: RockPaperScissorsDB, my_name: str):
         if player.user.username != my_name:
             opponent = player.user.username
             opponent_score = player.score
+            opponent_avatar = player.user.avatar
+            has_moved_opponent = bool(player.committed_move is not None)
         else:
             my_score = player.score
+            my_avatar = player.user.avatar
+            has_moved_me = bool(player.committed_move is not None)
     return Game_Response(id=game.id,
                          me=my_name,
                          opponent=opponent,
                          goal=game.goal,
                          my_score=my_score,
+                         my_avatar=my_avatar,
                          opponent_score=opponent_score,
+                         opponent_avatar=opponent_avatar,
+                         has_moved_opponent= has_moved_opponent,
+                         has_moved_me=has_moved_me,
                          date_created=game.date_created,
                          last_activity=game.last_activity,
                          finished=game.finished)
@@ -53,6 +65,9 @@ def make_response_from_db(game: RockPaperScissorsDB, my_name: str):
 
 ##### database utilities
 def create_game(rps_request: Game_Request, db: Session):
+    if not rps_request:
+        print("im not creating from null")
+        return None
     user1 = db.query(UserDB).filter(UserDB.username == rps_request.player1).one_or_none()
     user2 = db.query(UserDB).filter(UserDB.username == rps_request.player2).one_or_none()
     if not (user1 and user2):
@@ -123,3 +138,7 @@ def update(game: RockPaperScissorsDB, db: Session):
 
 def getGames(user: UserDB, db: Session):
     return db.query(RockPaperScissorsDB).join(RPS_PlayerDB).filter(RPS_PlayerDB.user == user)
+
+
+def external_update():
+    pass
