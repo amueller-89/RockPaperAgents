@@ -101,14 +101,15 @@
 <div id="modal-choose-avatar" class="ui tiny modal">
     <div class="header">Choose your avatar</div>
     <p style="margin-bottom:10px;"></p>
+    <div class = "content">
+        <div class = "ui form three column center aligned grid" id="list-default-avatars">
 
-    <div class = "ui form three column center aligned grid" id="list-default-avatars">
-
+        </div>
     </div>
     <p style="margin-bottom:10px;"></p>
     <div class="actions">
-        <button class="ui negative basic button" onclick=""> Cancel </button>
-        <button class="ui primary basic button deny" onclick="set_avatar()"> Confirm </button>
+        <button class="ui secondary button deny" onclick=""> Cancel </button>
+        <button class="ui positive button deny" onclick="set_avatar()"> Confirm </button>
     </div>
 </div>
 
@@ -188,6 +189,7 @@
             },
             success: function () {
                 console.log("Chose avatar: " + avatar_name + " in account settings.")
+                getMyRecentMessages()
             },
             error: function () {
                 console.log(send.responseJSON)
