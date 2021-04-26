@@ -187,7 +187,9 @@ async def send_message(outgoing: OutgoingMessage, current_user: UserPydantic = D
     if not recipient:
         raise HTTPException(status_code=400, detail="recipient name not found")
     message_request = MessageRequest(sender_id=sender_id, recipient_id=recipient.id, content=outgoing.content)
-    create_message(message_request, db)
+    response = make_message_response_from_db(create_message(message_request, db))
+    await manager.inform_recipient(response)
+    return response
 
 
 @app.get("/get_default_avatars/")

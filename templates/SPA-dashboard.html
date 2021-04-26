@@ -10,7 +10,8 @@
     let gameCreateButtons = []
     let gameColors = []
 
-    let fetchedGames = {}       // array of Game_Responses
+    let fetchedGames = {}       // dict of Game_Responses, keys are ids
+    let fetchedMessages = []
 
     let rps_move = -1
     let rps_id
@@ -107,12 +108,19 @@
             console.log("websocket received:")
             let json = JSON.parse(JSON.parse(event.data))
             console.log(json)
-            fetchedGames[json.id] = json
-            if (rps_id == json.id) {
-                configure_rps_view(rps_id)
+            if (json.type == "rps") {  // check wether games an incoming rps instance
+                fetchedGames[json.id] = json
+                if (rps_id == json.id) {
+                    configure_rps_view(rps_id)
+                }
+                drawMyCurrentGames()
+                drawMyFinishedGames()
             }
-            drawMyCurrentGames()
-            drawMyFinishedGames()
+            if (json.type == "message") {
+                fetchedMessages.splice(0, 0, json)
+                drawMyRecentMessages()
+            }
+
         }
     }
 
@@ -255,7 +263,7 @@
         if (!goal) {
             goal = 3
         }
-        //console.log("new rps" + opponent+ " "+ goal)
+
         const token = window.localStorage.getItem("RPAtoken")
         const createRPS = $.ajax({
             url: "/createRPS/" + opponent + "/" + goal,
@@ -266,6 +274,28 @@
             success: function () {
                 console.log("created new rps vs " + opponent + ", goal: " + goal)
                 document.getElementById("field-rps-opp").classList.remove('error')
+                const message = document.getElementById("input-rps-message").value
+                console.log("tryna send from creation")
+                console.log(message)
+                console.log(opponent)
+                const send = $.ajax({
+                    url: "/send/",
+                    type: "POST",
+                    beforeSend: function (xhr) {
+                        xhr.setRequestHeader('Authorization', "Bearer " + token);
+                    },
+                    contentType: 'application/json',
+                    data: JSON.stringify({"recipient": opponent, "content": message}),
+                    dataType: 'json',
+                    success: function () {
+                        console.log("sent (from creation) successfully")
+                    },
+                    error: function () {
+                        //  general error handling ala oops something went wrong
+                        console.log(send.responseJSON)
+                    }
+                });
+
                 document.getElementById("input-rps-opp").value = ""
                 document.getElementById("input-rps-message").value = ""
                 $('#rps-new-dropdown').dropdown('get value')
@@ -409,6 +439,38 @@
     }
 
 
+    function drawMyRecentMessages() {
+        console.log("drawing recent messages from fetched")
+        const msg_list = document.getElementById("list-messages")
+        msg_list.innerHTML = ""
+        const messages = fetchedMessages // maybe: only those received, ordered by recency
+        console.log(messages)
+        let max = 5;
+        if (messages.length < max)
+            max = messages.length
+        for (let i = max - 1; i >= 0; i--) {
+            let current = messages[i]
+            console.log("drawing current " + current.content + " from " + current.sender)
+            let prettyDate = dateConvert(current["date"])
+
+            if (current["content"].length > 140) {
+                current["content"] = current["content"].substr(0, 140)
+                current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
+            }
+
+            var msgHTML = '<div class="comment"><a class="avatar">\n' +
+                '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
+                '                    </a><div class="content">\n' +
+                '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
+                '                            <span class="date">' + prettyDate + '</span>\n' +
+                '                        </div><div class="text">' + current["content"] + '</div><div class="actions" onclick="reply(\'' + current["sender"] + '\')">\n' +
+                '                            <a class="reply">Reply</a>\n' +
+                '                        </div></div>'
+            msg_list.innerHTML += msgHTML
+        }
+    }
+
+
     function getMyRecentMessages() {
         const token = window.localStorage.getItem("RPAtoken")
         const mymessagesGET = $.ajax({
@@ -419,32 +481,34 @@
             },
             success: function () {
                 console.log("fetching recent messages")
-                let msg_list = document.getElementById("list-messages")
-                msg_list.innerHTML = ""
-                const messages = mymessagesGET.responseJSON
-                let max = messages.length - 5;
-                if (max < 0)
-                    max = 0
-                for (let i = messages.length - 1; i >= max; i--) {
-                    //await new Promise(r => setTimeout(r, 2000));
-                    let current = messages[i]
-                    let prettyDate = dateConvert(current["date"])
-
-                    if (current["content"].length > 140) {
-                        current["content"] = current["content"].substr(0, 140)
-                        current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
-                    }
-
-                    var msgHTML = '<div class="comment"><a class="avatar">\n' +
-                        '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
-                        '                    </a><div class="content">\n' +
-                        '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
-                        '                            <span class="date">' + prettyDate + '</span>\n' +
-                        '                        </div><div class="text">' + current["content"] + '</div><div class="actions" onclick="reply(\'' + current["sender"] + '\')">\n' +
-                        '                            <a class="reply">Reply</a>\n' +
-                        '                        </div></div>'
-                    msg_list.innerHTML += msgHTML
-                }
+                fetchedMessages = mymessagesGET.responseJSON
+                drawMyRecentMessages()
+                // let msg_list = document.getElementById("list-messages")
+                // msg_list.innerHTML = ""
+                // const messages = mymessagesGET.responseJSON
+                // let max = messages.length - 5;
+                // if (max < 0)
+                //     max = 0
+                // for (let i = messages.length - 1; i >= max; i--) {
+                //     //await new Promise(r => setTimeout(r, 2000));
+                //     let current = messages[i]
+                //     let prettyDate = dateConvert(current["date"])
+                //
+                //     if (current["content"].length > 140) {
+                //         current["content"] = current["content"].substr(0, 140)
+                //         current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
+                //     }
+                //
+                //     var msgHTML = '<div class="comment"><a class="avatar">\n' +
+                //         '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
+                //         '                    </a><div class="content">\n' +
+                //         '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
+                //         '                            <span class="date">' + prettyDate + '</span>\n' +
+                //         '                        </div><div class="text">' + current["content"] + '</div><div class="actions" onclick="reply(\'' + current["sender"] + '\')">\n' +
+                //         '                            <a class="reply">Reply</a>\n' +
+                //         '                        </div></div>'
+                //     msg_list.innerHTML += msgHTML
+                // }
             }
 
         });

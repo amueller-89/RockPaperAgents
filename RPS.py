@@ -21,6 +21,7 @@ class Move_Request(BaseModel):
 
 
 class Game_Response(BaseModel):
+    type: str = "rps"
     id: str
     me: str
     opponent: str
@@ -127,6 +128,7 @@ def update(game: RockPaperScissorsDB, db: Session):
                     player2.won = False  # ugly af
             db.commit()
             return game
+
     for player in game.players:
         if player.committed_move is None:
             # print("not all moves committed")
@@ -145,7 +147,7 @@ def update(game: RockPaperScissorsDB, db: Session):
         p2.score += 1
     p1.committed_move = None
     p2.committed_move = None
-
+    update(game, db)
     db.commit()
     return game
 

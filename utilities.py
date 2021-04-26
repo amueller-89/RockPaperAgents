@@ -114,6 +114,12 @@ class ConnectionManager:
             return
         await self.active_connections[opponent].send_json(response.json())
 
+    async def inform_recipient(self, message: MessageResponse):
+        if message.recipient not in self.active_connections:
+            print("recipient not online")
+            return
+        await self.active_connections[message.recipient].send_json(message.json())
+
 
 # security settings and initializations
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

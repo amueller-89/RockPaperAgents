@@ -35,6 +35,7 @@ class OutgoingMessage(BaseModel):
 
 
 class MessageResponse(BaseModel):
+    type: str = "message"
     sender: str
     sender_avatar: str
     recipient: str
