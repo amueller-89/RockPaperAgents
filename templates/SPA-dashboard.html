@@ -132,16 +132,16 @@
             if (!fetchedGames[id].finished) {
                 let game = fetchedGames[id]
                 let border = ""
+                let check = ""
                 if (game["has_moved_me"]) {
-                    border += "green"
+                    check = ' <i class="check icon"></i> '
                 }
                 if (game["has_moved_opponent"]) {
-                    border += "red"
+                    border = "black"
                 }
                 let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
                     + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
-                    + game["opponent"]
-                    + '</div></div></div>'
+                    + game["opponent"] + check +'</div></div></div>'
 
                 current_games_list.innerHTML += btnHTML
             }
@@ -602,7 +602,19 @@
 
 
     <div class="four wide column">
-        <h3 class="ui dividing header">Your current games</h3>
+        <h3 class="ui dividing header">
+                <div class="ui grid">
+                    <div class="thirteen wide column">
+                         Your current games
+                    </div>
+
+                    <div class="column">
+                        <div data-tooltip="A checkmark means you have committed your move.
+                        A black outline indicates that your opponent is waiting for you.">
+                          <i class="question circle outline icon" ></i></div>
+                    </div>
+                </div>
+</h3>
         <div class="ui list" id="list-current-games">
         </div>
     </div>
@@ -615,7 +627,19 @@
 
     <div class="right floated four wide column">
         <div class="ui comments">
-            <h3 class="ui dividing header">Recent private messages</h3>
+            <h3 class="ui dividing header">
+                <div class="ui grid">
+                    <div class="thirteen wide column">
+                         Recent messages
+                    </div>
+
+                    <div class="column">
+                          <i class="paper plane outline icon" id="btn-newmessage" onclick="$('#modal-newmessage').modal({
+    autofocus: true
+  }).modal('show');"></i>
+                    </div>
+                </div>
+</h3>
             <div id="list-messages">
             </div>
         </div>
@@ -638,12 +662,7 @@
         </button>
     </div>
     <div class="right floated four wide column">
-        <button class="ui labeled icon button" id="btn-newmessage" onclick="$('#modal-newmessage').modal({
-    autofocus: true
-  }).modal('show');">
-            <i class="paper plane outline icon"></i>
-            new message
-        </button>
+
 
     </div>
 
