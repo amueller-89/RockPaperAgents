@@ -32,11 +32,9 @@
                         gameColors.push(games[i][1])
                     }
                     var btnHTML = '<div class="item"><button id="btn-' + x + '" class="ui ' + games[i][1]
-                        + ' disabled button" style="opacity: 1;" onclick="create(\'' + x + '\')">' + x
+                        + ' disabled button" style="opacity: 1;" data-tooltip="The classic - Paper beats Rock. Scissors beats Paper. But Rock beats Scissors!" onclick="create(\'' + x + '\')">' + x
                         + '</button></div>'
                     games_list.innerHTML += btnHTML
-
-
                 }
                 authorize()
             },
@@ -403,10 +401,7 @@
         console.log("show rps# " + id)
         configure_rps_view(id)
         $('#modal-RPS').modal({
-            onApprove: function () {
-                console.log('on approve')
-                return false
-            }
+            autofocus: false
         }).modal('show')
     }
 
@@ -455,10 +450,9 @@
 
             if (current["content"].length > 140) {
                 current["content"] = current["content"].substr(0, 140)
-                current["content"] += " ..."        // TODO probably make the dots into a link that shows the full message or something like that
-            }
+                current["content"] += " ..."                   }
 
-            var msgHTML = '<div class="comment"><a class="avatar">\n' +
+            let msgHTML = '<div class="comment"><a class="avatar">\n' +
                 '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
                 '                    </a><div class="content">\n' +
                 '                        <a class="author">' + current["sender"] + '</a><div class="metadata">\n' +
@@ -610,7 +604,7 @@
 
                     <div class="column">
                         <div data-tooltip="A checkmark means you have committed your move.
-                        A black outline indicates that your opponent is waiting for you.">
+                        A black outline indicates that your opponent is waiting for you." data-variation="basic">
                           <i class="question circle outline icon" ></i></div>
                     </div>
                 </div>
