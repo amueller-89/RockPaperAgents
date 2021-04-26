@@ -124,7 +124,7 @@ def avatar(avatar_name):
 # returns the victory splash
 @app.get("/games/victory")
 def victory_splash():
-    return FileResponse("images/games/victory.png")
+    return FileResponse("images/games/victory-alt.png")
 
 
 # returns the defeat splash
