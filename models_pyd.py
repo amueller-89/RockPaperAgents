@@ -24,10 +24,13 @@ class RegisterRequest(BaseModel):
 
 class MessageRequest(BaseModel):
     sender_id: int
-    recipient_id: int
+    recipient_id: Optional[str] = None
     content: str
     date: Optional[datetime] = datetime.now()
 
+
+class ChatMessage(BaseModel):
+    message: str
 
 class OutgoingMessage(BaseModel):
     recipient: str
@@ -40,6 +43,14 @@ class MessageResponse(BaseModel):
     sender_avatar: str
     recipient: str
     recipient_avatar: str
+    content: str
+    date: datetime
+
+
+class ChatResponse(BaseModel):
+    type: str = "chat"
+    sender: str
+    sender_avatar: str
     content: str
     date: datetime
 

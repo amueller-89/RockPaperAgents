@@ -3,7 +3,7 @@
 {%block dashboard%}
 <script>
 
-    let loggedIn    //are these useful?
+    let loggedIn = false   //are these useful?
     let username
     let websocket
 
@@ -12,6 +12,7 @@
 
     let fetchedGames = {}       // dict of Game_Responses, keys are ids
     let fetchedMessages = []
+    let fetchedChat = []
 
     let rps_move = -1
     let rps_id
@@ -43,6 +44,22 @@
                 logout()
             }
         });
+
+        const chatGET = $.ajax({
+            url: "/chat",
+            type: "GET",
+            success: function () {
+                fetchedChat = chatGET.responseJSON
+                console.log(fetchedChat)
+                drawChatMessages()
+            },
+            error: function () {
+                console.log("cant even get chat.")
+
+            }
+
+        });
+
     }
 
 
@@ -89,7 +106,10 @@
         document.getElementById("field-rps-opp").classList.remove('error')
         document.getElementById("input-rps-opp").value = ""
         document.getElementById("input-rps-message").value = ""
-        //console.log(gameCreateButtons)
+        document.getElementById("field-recipient").classList.remove('error')
+        document.getElementById("input-recipient").value = ""
+        document.getElementById("input-message").value = ""
+
         gameCreateButtons.forEach(disable_create_button);
 
 
@@ -118,6 +138,11 @@
                 fetchedMessages.splice(0, 0, json)
                 drawMyRecentMessages()
             }
+             if (json.type == "chat") {
+                 console.log("external chat update")
+                fetchedChat.splice(0, 0, json)
+                drawChatMessages()
+            }
 
         }
     }
@@ -139,7 +164,7 @@
                 }
                 let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
                     + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
-                    + game["opponent"] + check +'</div></div></div>'
+                    + game["opponent"] + check + '</div></div></div>'
 
                 current_games_list.innerHTML += btnHTML
             }
@@ -433,6 +458,24 @@
 
     }
 
+    function drawChatMessages() {
+        console.log("drawing chat, soon")
+        const chat_list = document.getElementById("list-chat")
+        chat_list.innerHTML = ""
+        const chat = fetchedChat
+        let max = 10;     //in the far future: scrollable
+        if (chat.length < max)
+            max = chat.length
+        for (let i = max - 1; i >= 0; i--) {
+            let current = chat[i]
+            time = dateConvert(current.date).substr(0, 5)
+            let chat_html = "<div class=\"item\">\n" +
+                "                    <b>" + current.sender + " </b>[" + time + "]:" + current.content + "\n" +
+                "                </div>"
+
+            chat_list.innerHTML += chat_html
+        }
+    }
 
     function drawMyRecentMessages() {
         console.log("drawing recent messages from fetched")
@@ -445,12 +488,13 @@
             max = messages.length
         for (let i = max - 1; i >= 0; i--) {
             let current = messages[i]
-            console.log("drawing current " + current.content + " from " + current.sender)
+            // console.log("drawing current " + current.content + " from " + current.sender)
             let prettyDate = dateConvert(current["date"])
-
+            // does this actually delete the message TODO
             if (current["content"].length > 140) {
                 current["content"] = current["content"].substr(0, 140)
-                current["content"] += " ..."                   }
+                current["content"] += " ..."
+            }
 
             let msgHTML = '<div class="comment"><a class="avatar">\n' +
                 '                        <img src="avatar/' + current["sender_avatar"] + '" alt="">\n' +
@@ -516,8 +560,46 @@
         $('#modal-newmessage').modal({
             autofocus: false
         }).modal('show')
-        $("#input-message").focus(); // TODO after this is executed, focus jumps back to the recipient field. why?
+        $("#input-message").focus();
     }
+
+    function showNewMessage() {
+        if (loggedIn) {
+            $('#modal-newmessage').modal({
+                autofocus: true
+            }).modal('show');
+        }
+
+    }
+
+    function sendChat() {
+        console.log("sending chat?")
+        message = document.getElementById("input-chat").value
+        document.getElementById("input-chat").value = ""
+        if (message != "") {
+            const token = window.localStorage.getItem("RPAtoken")
+            const send = $.ajax({
+                url: "/chat",
+                type: "POST",
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader('Authorization', "Bearer " + token);
+                },
+                data: JSON.stringify({"message": message}),
+                success: function () {
+                    console.log("chat sent successfully")
+                    console.log(send.responseJSON)
+                    // const message_response = send.responseJSON
+                    // fetchedChat.splice(0, 0, message_response)
+                    // drawChatMessages()
+                },
+                error: function () {
+                    //  general error handling ala oops something went wrong
+                    console.log(send.responseJSON)
+                }
+            });
+        }
+    }
+
 
     function send() {
         const recipient = document.getElementById("input-recipient").value
@@ -542,6 +624,9 @@
             error: function () {
                 //  general error handling ala oops something went wrong
                 console.log(send.responseJSON)
+                if (!loggedIn) {
+                    // TODO tell the user
+                }
                 document.getElementById("field-recipient").classList.add('error')
                 //document.getElementById("input-recipient").setAttribute("data-content", "popup")
             }
@@ -550,12 +635,12 @@
 
 
     function disable_create_button(game) {
-        console.log("disabling " + game)
+        //console.log("disabling " + game)
         document.getElementById("btn-" + game).classList.add("disabled")
     }
 
     function enable_create_button(game) {
-        console.log("enable " + game)
+        //console.log("enable " + game)
         document.getElementById("btn-" + game).classList.remove("disabled")
     }
 
@@ -581,6 +666,11 @@
         $('.ui.dropdown')
             .dropdown()
         ;
+        document.getElementById("input-chat").addEventListener("keyup", function (event) {
+            if (event.keyCode === 13) {
+                sendChat()
+            }
+        })
     })
 
 </script>
@@ -597,43 +687,95 @@
 
     <div class="four wide column">
         <h3 class="ui dividing header">
-                <div class="ui grid">
-                    <div class="thirteen wide column">
-                         Your current games
-                    </div>
-
-                    <div class="column">
-                        <div data-tooltip="A checkmark means you have committed your move.
-                        A black outline indicates that your opponent is waiting for you." data-variation="basic">
-                          <i class="question circle outline icon" ></i></div>
-                    </div>
+            <div class="ui grid">
+                <div class="thirteen wide column">
+                    online
                 </div>
-</h3>
+                <div class="column">
+                    <div data-tooltip="These players are currently online. Challenge them to a game!"
+                         data-variation="basic">
+                        <i class="question circle outline icon"></i></div>
+                </div>
+            </div>
+        </h3>
+        <div class="ui list">
+            <div class="item">alex</div>
+            <div class="item">martha</div>
+            <div class="item">ivan</div>
+        </div>
+    </div>
+
+    <div class="eight wide column">
+        <h3 class="ui dividing header">
+            chat
+        </h3>
+        <div class="ui relaxed list" id="list-chat">
+            <div class="item">
+                <b>Ivan </b>[14:15]: Hallo
+            </div>
+            <div class="item">
+                <b>Alex </b>[14:17]: na auch hier
+            </div>
+        </div>
+
+        <div class="ui fluid action input">
+            <input type="text" id="input-chat">
+            <div class="ui button" onclick="sendChat()">send</div>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<div class="ui grid">
+    <div class="four wide column">
+        <h3 class="ui dividing header">
+            <div class="ui grid">
+                <div class="thirteen wide column">
+                    Your current games
+                </div>
+                <div class="column">
+                    <div data-tooltip="A checkmark means you have committed your move.
+                        A black outline indicates that your opponent is waiting for you." data-variation="basic">
+                        <i class="question circle outline icon"></i></div>
+                </div>
+            </div>
+        </h3>
         <div class="ui list" id="list-current-games">
         </div>
     </div>
 
     <div class="four wide column">
-        <h3 class="ui dividing header">Recently finished games</h3>
+        <h3 class="ui dividing header">
+            <div class="ui grid">
+                <div class="thirteen wide column">
+                    Recently finished games
+                </div>
+                <div class="column">
+                    <div data-tooltip="Statistics, baby!" data-variation="basic">
+                        <i class="file alternate outline icon" onclick="$('#modal-stats').modal('show');"></i></div>
+                </div>
+            </div>
+        </h3>
         <div class="ui list" id="list-finished-games">
         </div>
     </div>
 
-    <div class="right floated four wide column">
+    <div class="four wide column">
         <div class="ui comments">
             <h3 class="ui dividing header">
                 <div class="ui grid">
                     <div class="thirteen wide column">
-                         Recent messages
+                        Private messages
                     </div>
 
                     <div class="column">
-                          <i class="paper plane outline icon" id="btn-newmessage" onclick="$('#modal-newmessage').modal({
-    autofocus: true
-  }).modal('show');"></i>
+                        <div data-tooltip="Send a message">
+                            <i class="paper plane outline icon" id="btn-newmessage" onclick="showNewMessage()"></i>
+                        </div>
                     </div>
                 </div>
-</h3>
+            </h3>
             <div id="list-messages">
             </div>
         </div>
@@ -644,6 +786,7 @@
 
 
 <div class="ui grid">
+
     <div class="left floated four wide column">
         <button class="ui icon button">
             <i class="hand rock outline icon"></i><br>
@@ -656,8 +799,6 @@
         </button>
     </div>
     <div class="right floated four wide column">
-
-
     </div>
 
 </div>
@@ -679,6 +820,20 @@
         <button class="ui labeled icon button" id="btn-msg" onclick="send()">
             <i class="paper plane outline icon"></i>
             send
+        </button>
+    </div>
+</div>
+
+<div id="modal-stats" class="ui small modal">
+    <i class="close icon"></i>
+    <div class="header">The complete history of your life</div>
+    <div class="content">
+        There is nothing here yet.
+        <!--         TODO-->
+    </div>
+    <div class="actions">
+        <button class="ui black deny button">
+            ok
         </button>
     </div>
 </div>
@@ -721,7 +876,7 @@
 </div>
 
 
-<div id="modal-RPS" class="ui large modal">
+<div id="modal-RPS" class="ui small modal">
     <i class="close icon"></i>
     <div class="header">
         <div class="ui grid">

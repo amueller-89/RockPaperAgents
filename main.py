@@ -5,14 +5,14 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 import RPS
 from utilities import ACCESS_TOKEN_EXPIRE_MINUTES, get_db, create_access_token, get_current_user, get
 from utilities import populate, verify_password, make_message_response_from_db
-from utilities import create_message, set_avatar, create_user, ConnectionManager
-from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest, GameType
+from utilities import create_message, create_chat_message, set_avatar, create_user, ConnectionManager
+from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest, GameType, ChatMessage
 
 from database import engine
 from models_DB import UserDB, MessageDB, RockPaperScissorsDB
@@ -140,7 +140,23 @@ def games_available():
     return games
 
 
+# returns recent {limit} messages in the public chat room
+@app.get("/chat")
+def recent_chat(limit: int = 50, db: Session = Depends(get_db)):
+    messages_db = db.query(MessageDB).filter(MessageDB.recipient_id == None).order_by(MessageDB.date.desc()).limit(limit).all()
+    return [make_message_response_from_db(m) for m in messages_db]
+
+
 #######  endpoints restricted to logged in users
+@app.post("/chat")
+async def chat(message: ChatMessage, current_user: UserPydantic = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
+    user_id = get(current_user.username, db).id
+    msg_db = create_chat_message(MessageRequest(sender_id=user_id, content=message.message, date=datetime.now()),
+                        db)
+    response = make_message_response_from_db(msg_db)
+    await manager.inform_chat(response)
+    return response
 
 
 # returns the current user (pydantic)

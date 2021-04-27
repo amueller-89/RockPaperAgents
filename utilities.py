@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import jwt, JWTError
+from time import sleep
 import random
 
 from fastapi import Depends, HTTPException, WebSocket
@@ -10,44 +11,47 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from database import SessionLocal
-from models_pyd import MessageResponse, UserPydantic, RegisterRequest, MessageRequest
+from models_pyd import MessageResponse, UserPydantic, RegisterRequest, MessageRequest, ChatResponse
 import RPS
 from models_DB import UserDB, MessageDB, RockPaperScissorsDB
 
 
 # populates the database with a bunch of user accounts and messages, RPS games and moves
 def populate(db: Session):
-    alex = RegisterRequest(username="alex", email="alex@example.com", password="geheim")
-    create_user(register_request=alex, db=db)
-
-    martha = RegisterRequest(username="martha", email="martha@example.com", password="secret")
-    create_user(register_request=martha, db=db)
-
-    ivan = RegisterRequest(username="ivan", email="ivan@example.com", password="juri")
-    create_user(register_request=ivan, db=db)
-
+    # alex = RegisterRequest(username="alex", email="alex@example.com", password="geheim")
+    # create_user(register_request=alex, db=db)
+    #
+    # martha = RegisterRequest(username="martha", email="martha@example.com", password="secret")
+    # create_user(register_request=martha, db=db)
+    #
+    # ivan = RegisterRequest(username="ivan", email="ivan@example.com", password="juri")
+    # create_user(register_request=ivan, db=db)
+    #
+    # asd = RegisterRequest(username="asd", email="asd@example.com", password="asd")
+    # create_user(register_request=asd, db=db)
+    #
     ivan = db.query(UserDB).filter(UserDB.username == "ivan").one_or_none()
     alex = db.query(UserDB).filter(UserDB.username == "alex").one_or_none()
     martha = db.query(UserDB).filter(UserDB.username == "martha").one_or_none()
-    set_avatar('zac', ivan, db)
-    set_avatar('lucian', alex, db)
-    set_avatar('lilia', martha, db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
-    create_message(message_request=msg, db=db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
-    create_message(message_request=msg, db=db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
-    create_message(message_request=msg, db=db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
-    create_message(message_request=msg, db=db)
+    # set_avatar('zac', ivan, db)
+    # set_avatar('lucian', alex, db)
+    # set_avatar('lilia', martha, db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
+    # create_message(message_request=msg, db=db)
 
     # print("ids ivan, alex: ", ivan.id, alex.id)
     # # no bidirectionality
@@ -76,6 +80,16 @@ def populate(db: Session):
     #     RPS.commit_move(move_request, db)
     #     move_request = RPS.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
     #     RPS.commit_move(move_request, db)
+
+    chat = ["Hallo wer will spielen?", "ja ich bitte", "slipstrike oder rps?",
+            "mega bock auf scheresteinpapier, bis 7?", "ja lets go"]
+    i = 0
+    for m in chat:
+        print(f"creating chat message {i}")
+        create_chat_message(MessageRequest(sender_id=alex.id if i % 2 == 0 else ivan.id, content=m, date=datetime.now()), db)
+        i += 1
+        sleep(1)
+
 
 
 # websocket stuff
@@ -119,6 +133,11 @@ class ConnectionManager:
             print("recipient not online")
             return
         await self.active_connections[message.recipient].send_json(message.json())
+
+    async def inform_chat(self, message: ChatResponse):
+        for user in self.active_connections:
+            print(f"sending to {user}")
+            await self.active_connections[user].send_json(message.json())
 
 
 # security settings and initializations
@@ -179,9 +198,13 @@ def get_db():
 
 # bridging SQLAlchemy and pydantic model
 def make_message_response_from_db(message_db: MessageDB):
-    return MessageResponse(sender=message_db.sender.username, sender_avatar=message_db.sender.avatar,
-                           recipient=message_db.recipient.username, recipient_avatar=message_db.recipient.avatar,
-                           content=message_db.content, date=message_db.date)
+    if message_db.recipient is not None:
+        return MessageResponse(sender=message_db.sender.username, sender_avatar=message_db.sender.avatar,
+                               recipient=message_db.recipient.username, recipient_avatar=message_db.recipient.avatar,
+                               content=message_db.content, date=message_db.date)
+    else:
+        return ChatResponse(sender=message_db.sender.username, sender_avatar=message_db.sender.avatar,
+                            content= message_db.content, date=message_db.date)
 
 
 # bridging SQLAlchemy and pydantic model
@@ -222,21 +245,36 @@ def create_user(register_request: RegisterRequest, db: Session):
     return user
 
 
+def create_chat_message(message_request: MessageRequest, db: Session):
+    sender = db.query(UserDB).filter(UserDB.id == message_request.sender_id).one_or_none()
+    if not sender:
+        return None
+    message = MessageDB(
+        content=message_request.content,
+        date=message_request.date,
+        sender_id=message_request.sender_id,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return message
+
+
 def create_message(message_request: MessageRequest, db: Session):
     sender = db.query(UserDB).filter(UserDB.id == message_request.sender_id).one_or_none()
     recipient = db.query(UserDB).filter(UserDB.id == message_request.recipient_id).one_or_none()
     if not sender or not recipient:
         return None
-    msg = MessageDB(
+    message = MessageDB(
         content=message_request.content,
         date=message_request.date,
         sender_id=message_request.sender_id,
         recipient_id=message_request.recipient_id
     )
-    db.add(msg)
+    db.add(message)
     db.commit()
-    db.refresh(msg)
-    return msg
+    db.refresh(message)
+    return message
 
 
 def set_avatar(name: str, user: UserDB, db: Session):
