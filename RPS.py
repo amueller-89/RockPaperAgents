@@ -32,6 +32,8 @@ class Game_Response(BaseModel):
     opponent_avatar: str
     has_moved_opponent: bool
     has_moved_me: bool
+    my_history: str
+    opponent_history: str
     date_created: datetime
     last_activity: Optional[datetime]
     finished: bool
@@ -39,15 +41,19 @@ class Game_Response(BaseModel):
 
 def make_response_from_db(game: RockPaperScissorsDB, my_name: str):
     opponent = ""
+    opponent_history = "",
+    my_history= "",
     for player in game.players:
         if player.user.username != my_name:
             opponent = player.user.username
             opponent_score = player.score
             opponent_avatar = player.user.avatar
+            opponent_history = player.moves
             has_moved_opponent = bool(player.committed_move is not None)
         else:
             my_score = player.score
             my_avatar = player.user.avatar
+            my_history = player.moves
             has_moved_me = bool(player.committed_move is not None)
     return Game_Response(id=game.id,
                          me=my_name,
@@ -57,6 +63,8 @@ def make_response_from_db(game: RockPaperScissorsDB, my_name: str):
                          my_avatar=my_avatar,
                          opponent_score=opponent_score,
                          opponent_avatar=opponent_avatar,
+                         my_history=my_history,
+                         opponent_history=opponent_history,
                          has_moved_opponent=has_moved_opponent,
                          has_moved_me=has_moved_me,
                          date_created=game.date_created,
@@ -145,6 +153,8 @@ def update(game: RockPaperScissorsDB, db: Session):
     if (p1.committed_move - p2.committed_move) % 3 == 2:
         print(p2.user.username + " scores")
         p2.score += 1
+    p1.moves += str(p1.committed_move)
+    p2.moves += str(p2.committed_move)
     p1.committed_move = None
     p2.committed_move = None
     update(game, db)
@@ -156,5 +166,3 @@ def getGames(user: UserDB, db: Session):
     return db.query(RockPaperScissorsDB).join(RPS_PlayerDB).filter(RPS_PlayerDB.user == user)
 
 
-def external_update():
-    pass

@@ -143,17 +143,18 @@ def games_available():
 # returns recent {limit} messages in the public chat room
 @app.get("/chat")
 def recent_chat(limit: int = 50, db: Session = Depends(get_db)):
-    messages_db = db.query(MessageDB).filter(MessageDB.recipient_id == None).order_by(MessageDB.date.desc()).limit(limit).all()
+    messages_db = db.query(MessageDB).filter(MessageDB.recipient_id == None).order_by(MessageDB.date.desc()).limit(
+        limit).all()
     return [make_message_response_from_db(m) for m in messages_db]
 
 
 #######  endpoints restricted to logged in users
 @app.post("/chat")
 async def chat(message: ChatMessage, current_user: UserPydantic = Depends(get_current_user),
-                          db: Session = Depends(get_db)):
+               db: Session = Depends(get_db)):
     user_id = get(current_user.username, db).id
     msg_db = create_chat_message(MessageRequest(sender_id=user_id, content=message.message, date=datetime.now()),
-                        db)
+                                 db)
     response = make_message_response_from_db(msg_db)
     await manager.inform_chat(response)
     return response

@@ -3,11 +3,6 @@ from sqlalchemy.orm import relationship
 
 from database import Base
 
-association_table = Table('association', Base.metadata,
-                          Column('player_id', Integer, ForeignKey('users.id')),
-                          Column('game_id', Integer, ForeignKey('rps.id'))
-                          )
-
 
 class UserDB(Base):
     __tablename__ = "users"
@@ -21,9 +16,6 @@ class UserDB(Base):
         "RPS_PlayerDB",
         back_populates="user"
     )
-    # messagesSent = relationship("MessageDB", back_populates="sender")
-    # messagesReceived = relationship("MessageDB")   TODO this is supposed to establish bidirectionality.
-    #  see https://stackoverflow.com/questions/67176054/multiple-foreign-key-paths-between-tables-and-bidirectionality-back-population
 
 
 class RPS_PlayerDB(Base):
@@ -34,6 +26,7 @@ class RPS_PlayerDB(Base):
     committed_move = Column(Integer)
     won = Column(Boolean)  # None - not finished, true/false = yes/no
 
+    moves = Column(String, default="")
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("UserDB", back_populates="plays")
 
@@ -62,5 +55,5 @@ class MessageDB(Base):
     sender_id = Column(Integer, ForeignKey("users.id"))
     sender = relationship("UserDB", foreign_keys=sender_id)
 
-    recipient_id = Column(Integer, ForeignKey("users.id"))
+    recipient_id = Column(Integer, ForeignKey("users.id"))  # none = public chat
     recipient = relationship("UserDB", foreign_keys=recipient_id)

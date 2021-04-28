@@ -138,8 +138,8 @@
                 fetchedMessages.splice(0, 0, json)
                 drawMyRecentMessages()
             }
-             if (json.type == "chat") {
-                 console.log("external chat update")
+            if (json.type == "chat") {
+                console.log("external chat update")
                 fetchedChat.splice(0, 0, json)
                 drawChatMessages()
             }
@@ -353,6 +353,8 @@
         //cleanup
 
         let game = fetchedGames[id]
+        console.log(game)
+        console.log("huh")
         if (game.finished) {
             document.getElementById("rps-resign-div").style.display = "none"
             if (game.my_score == game.goal) {
@@ -414,6 +416,7 @@
         }
         document.getElementById("rps-score").innerHTML += scoreHTML
         document.getElementById("rps-info").innerHTML = "RPS game #" + game.id
+
         if (game.last_activity) {
             document.getElementById("rps-info").innerHTML += "<br>last active: " + dateConvert(game.last_activity)
         }
@@ -470,7 +473,7 @@
             let current = chat[i]
             time = dateConvert(current.date).substr(0, 5)
             let chat_html = "<div class=\"item\">\n" +
-                "                    <b>" + current.sender + " </b>[" + time + "]:" + current.content + "\n" +
+                "                    <b>" + current.sender + " </b><text style='color: grey'>[" + time + "]:&nbsp;</text>" + current.content + "\n" +
                 "                </div>"
 
             chat_list.innerHTML += chat_html
@@ -710,12 +713,6 @@
             chat
         </h3>
         <div class="ui relaxed list" id="list-chat">
-            <div class="item">
-                <b>Ivan </b>[14:15]: Hallo
-            </div>
-            <div class="item">
-                <b>Alex </b>[14:17]: na auch hier
-            </div>
         </div>
 
         <div class="ui fluid action input">
