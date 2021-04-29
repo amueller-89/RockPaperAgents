@@ -18,31 +18,79 @@ class UserDB(Base):
     )
 
 
-class RPS_PlayerDB(Base):
-    __tablename__ = "playersRPS"
-
+class GameDB(Base):
+    __tablename__ = "games"
     id = Column(Integer, primary_key=True, index=True)
-    score = Column(Integer, default=0)
-    committed_move = Column(Integer)
+    type = Column(String)
+    players = relationship("PlayerDB", back_populates="game")
+
+    finished = Column(Boolean, default=False)
+    date_created = Column(DateTime)
+    last_activity = Column(DateTime)
+    history = Column(String, default="")
+
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_identity': 'game'
+    }
+
+
+class RockPaperScissorsDB(GameDB):
+    goal = Column(Integer, default=3)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'rps'
+    }
+
+
+class SlipStrikeDB(GameDB):
+    state = Column(Integer)  # None - between rounds, 1 - after exectuting first card, 2 - after executing 2nd card
+    __mapper_args__ = {
+        'polymorphic_identity': 'slip'
+    }
+
+
+class PlayerDB(Base):
+    __tablename__ = "players"
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String)
+
     won = Column(Boolean)  # None - not finished, true/false = yes/no
 
-    moves = Column(String, default="")
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("UserDB", back_populates="plays")
 
-    game_id = Column(Integer, ForeignKey("rps.id"))
-    game = relationship("RockPaperScissorsDB", back_populates="players")
+    game_id = Column(Integer, ForeignKey("games.id"))
+    game = relationship("GameDB", back_populates="players")
+
+    moves = Column(String, default="")
+
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_identity': 'player'
+    }
 
 
-class RockPaperScissorsDB(Base):
-    __tablename__ = "rps"
+class Slip_PlayerDB(PlayerDB):
+    committed_move_slip = Column(String)
+    position = Column(Integer)
+    discarded = Column(String, default="")
+    hit = Column(Boolean)
+    slip = Column(String)
+    cd1 = Column(String)
+    cd2 = Column(String)
 
-    id = Column(Integer, primary_key=True, index=True)
-    players = relationship("RPS_PlayerDB", back_populates="game")
-    finished = Column(Boolean, default=False)  # redundant so remove?
-    goal = Column(Integer, default=3)
-    date_created = Column(DateTime)
-    last_activity = Column(DateTime)
+    __mapper_args__ = {
+        'polymorphic_identity': 'slip_player'
+    }
+
+
+class RPS_PlayerDB(PlayerDB):
+    score = Column(Integer, default=0)
+    committed_move = Column(Integer)
+    __mapper_args__ = {
+        'polymorphic_identity': 'rps_player'
+    }
 
 
 class MessageDB(Base):

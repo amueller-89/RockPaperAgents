@@ -12,7 +12,7 @@ from starlette import status
 
 from database import SessionLocal
 from models_pyd import MessageResponse, UserPydantic, RegisterRequest, MessageRequest, ChatResponse
-import RPS
+import Game
 from models_DB import UserDB, MessageDB, RockPaperScissorsDB
 
 
@@ -61,13 +61,12 @@ def populate(db: Session):
     # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.recipient == alex)])
 
     for i in range(0, 4):
-        rps_request = RPS.Game_Request(player1="alex", player2="ivan", goal=2)
-        RPS.create_game(rps_request, db)
-    #find ivan's oldest unfinished game
+        rps_request = Game.Game_Request(player1="alex", player2="ivan", type="rps", goal=2)
+        Game.create_game(rps_request, db)
 
     for i in range(0, 10):
         # filter for unfinished games with ivan in them
-        ivan_games = RPS.getGames(ivan, db)
+        ivan_games = Game.getGames(ivan, db)
         ivan_games = ivan_games.filter(RockPaperScissorsDB.finished == False)
         # sort by date created, oldest first
         ivan_games = ivan_games.order_by(RockPaperScissorsDB.date_created)
@@ -76,10 +75,10 @@ def populate(db: Session):
 
         # commit a random move for both of us, to a random game
         game = ivan_games.all()[random.randint(0, len(ivan_games.all()) - 1)]
-        move_request = RPS.Move_Request(move=random.randint(0, 2), user_id=ivan.id, game_id=game.id)
-        RPS.commit_move(move_request, db)
-        move_request = RPS.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
-        RPS.commit_move(move_request, db)
+        move_request = Game.Move_Request(move=random.randint(0, 2), user_id=ivan.id, game_id=game.id)
+        Game.commit_move(move_request, db)
+        move_request = Game.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
+        Game.commit_move(move_request, db)
 
     chat = ["Hallo wer will spielen?", "ja ich bitte", "slipstrike oder rps?",
             "mega bock auf scheresteinpapier, bis 7?", "ja lets go"]
@@ -89,12 +88,10 @@ def populate(db: Session):
         create_chat_message(
             MessageRequest(sender_id=alex.id if i % 2 == 0 else ivan.id, content=m, date=datetime.now()), db)
         i += 1
-        sleep(1)
+        sleep(.5)
 
-
-# websocket stuff
-async def send_rps(message, websocket: WebSocket):
-    await websocket.send_text(message)
+    slip_request = Game.Game_Request(player1="alex", player2="ivan", type="slip")
+    Game.create_game(slip_request, db)
 
 
 class ConnectionManager:
@@ -111,7 +108,7 @@ class ConnectionManager:
     def connections(self):
         return [key for key in self.active_connections]
 
-    async def send_rps(self, response: RPS.Game_Response, opp: str):
+    async def send_rps(self, response: Game.Game_Response, opp: str):
         if opp not in self.active_connections:
             print("opp not online")
             return
@@ -122,7 +119,7 @@ class ConnectionManager:
             if p.user.username != me:
                 opponent = p.user.username
                 print("vs opponent: " + opponent)
-        response = RPS.make_response_from_db(game=game, my_name=opponent)
+        response = Game.make_response_from_db(game=game, my_name=opponent)
         if opponent not in self.active_connections:
             print("opp not online")
             return
@@ -200,7 +197,8 @@ def get_db():
 def make_message_response_from_db(message_db: MessageDB):
     if message_db.recipient is not None:
         return MessageResponse(sender=message_db.sender.username, sender_avatar=message_db.sender.avatar,
-                               recipient=message_db.recipient.username, recipient_avatar=message_db.recipient.avatar,
+                               recipient=message_db.recipient.username,
+                               recipient_avatar=message_db.recipient.avatar,
                                content=message_db.content, date=message_db.date)
     else:
         return ChatResponse(sender=message_db.sender.username, sender_avatar=message_db.sender.avatar,

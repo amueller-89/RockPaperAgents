@@ -162,10 +162,16 @@
                 if (game["has_moved_opponent"]) {
                     border = "black"
                 }
-                let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
-                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
-                    + game["opponent"] + check + '</div></div></div>'
-
+                let btnHTML = ""
+                if (game.type == "rps") {
+                    btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
+                        + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
+                        + game["opponent"] + check + '</div></div></div>'
+                }
+                if (game.type == "slip") {
+                    btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui teal label"> Slip </a><div class="ui basic ' + border
+                        + ' icon button">#' + game.id + ' vs. ' + game["opponent"] + check + '</div></div></div>'
+                }
                 current_games_list.innerHTML += btnHTML
             }
         }
@@ -179,17 +185,18 @@
                 let game = fetchedGames[id]
                 let border = ""
 
-                if (game.goal == game.my_score) {
+                if (game.won) {
                     border += "green"
-                }
-                if (game.goal == game.opponent_score) {
+                } else {
                     border += "red"
                 }
-                let btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
-                    + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
-                    + game["opponent"]
-                    + '</div></div></div>'
-
+                let btnHTML = ""
+                if (game.type == "rps") {
+                    btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
+                        + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
+                        + game["opponent"]
+                        + '</div></div></div>'
+                }
                 finished_games_list.innerHTML += btnHTML
             }
         }
@@ -208,6 +215,7 @@
                 for (let i in gamesJSON) {
                     fetchedGames[gamesJSON[i]["id"]] = gamesJSON[i]
                 }
+                console.log(fetchedGames)
                 drawMyCurrentGames()
                 drawMyFinishedGames()
             },
@@ -289,8 +297,11 @@
 
         const token = window.localStorage.getItem("RPAtoken")
         const createRPS = $.ajax({
-            url: "/createRPS/" + opponent + "/" + goal,
+            url: "/create/",
             type: "POST",
+            contentType: 'application/json',
+            data: JSON.stringify({"type": "rps", "player1":username, "player2": opponent, "goal": goal}),
+            dataType: 'json',
             beforeSend: function (xhr) {
                 xhr.setRequestHeader('Authorization', "Bearer " + token);
             },
@@ -340,9 +351,9 @@
 
     }
 
-
+    // from prefetched data!
     function configure_rps_view(id) {
-        // from prefetched data!
+        //cleanup
         document.getElementById("rps-opponent").innerHTML = ""
         document.getElementById("rps-me").innerHTML = ""
         document.getElementById("rps-score").innerHTML = ""
@@ -350,17 +361,20 @@
         rps_move = -1
         document.getElementById('btn-shoot').classList.add('disabled')
         document.getElementById('btn-shoot').innerHTML = "Shoot"
-        //cleanup
+
 
         let game = fetchedGames[id]
-        console.log(game)
-        console.log("huh")
         if (game.finished) {
             document.getElementById("rps-resign-div").style.display = "none"
-            if (game.my_score == game.goal) {
+            if (game.won == true) {
                 document.getElementById("rps-finished").innerHTML = '<img src="games/victory" alt="" width="300" height="auto">'
+                if(game.my_score < game.goal){
+                    document.getElementById("rps-finished").innerHTML += "opponent resigned!"
+                 }
             } else {
                 document.getElementById("rps-finished").innerHTML = '<img src="games/defeat" alt="" width="350" height="auto">'
+                if(game.opponent_score < game.goal){
+                    document.getElementById("rps-finished").innerHTML += "You resigned!"}
             }
             document.getElementById("rps-finished").style.display = "block"
             document.getElementById("rps-grid").style.display = "none"
@@ -433,13 +447,14 @@
         }).modal('show')
     }
 
-    function resign_rps(rps_id) {
+    function resign_rps(id) {
+        rps_id = id
         let checked = document.getElementById("checkbox-rps-resign").checked
-        console.log("resign rps#" + rps_id + ", " + checked)
+        console.log("resign rps#" + id + ", " + checked)
         if (checked) {
             const token = window.localStorage.getItem("RPAtoken")
             const resign = $.ajax({
-                url: "/resignRPS/" + rps_id,
+                url: "/resignRPS/" + id,
                 type: "put",
                 beforeSend: function (xhr) {
                     xhr.setRequestHeader('Authorization', "Bearer " + token);
@@ -451,6 +466,7 @@
                     fetchedGames[game.id] = game
                     drawMyCurrentGames()
                     drawMyFinishedGames()
+                    configure_rps_view(id)
                 },
                 error: function () {
                     //  general error handling ala oops something went wrong
@@ -873,7 +889,7 @@
 </div>
 
 
-<div id="modal-RPS" class="ui small modal">
+<div id="modal-RPS" class="ui modal">
     <i class="close icon"></i>
     <div class="header">
         <div class="ui grid">

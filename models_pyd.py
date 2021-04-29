@@ -32,6 +32,7 @@ class MessageRequest(BaseModel):
 class ChatMessage(BaseModel):
     message: str
 
+
 class OutgoingMessage(BaseModel):
     recipient: str
     content: str

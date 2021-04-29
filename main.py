@@ -8,14 +8,15 @@ from fastapi.responses import FileResponse
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-import RPS
+import Game
+from Game import Game_Request
 from utilities import ACCESS_TOKEN_EXPIRE_MINUTES, get_db, create_access_token, get_current_user, get
 from utilities import populate, verify_password, make_message_response_from_db
 from utilities import create_message, create_chat_message, set_avatar, create_user, ConnectionManager
 from models_pyd import UserPydantic, MessageRequest, OutgoingMessage, RegisterRequest, GameType, ChatMessage
 
 from database import engine
-from models_DB import UserDB, MessageDB, RockPaperScissorsDB
+from models_DB import UserDB, MessageDB, RockPaperScissorsDB, GameDB, SlipStrikeDB
 import models_DB
 
 app = FastAPI()
@@ -185,13 +186,14 @@ async def recent_games(limit: int = 5, current_user: UserPydantic = Depends(get_
                        db: Session = Depends(get_db)):
     me_db = get(current_user.username, db)
 
-    current_games = RPS.getGames(me_db, db).filter(RockPaperScissorsDB.finished == False) \
-        .order_by(RockPaperScissorsDB.last_activity.desc()).all()
-    finished_games = RPS.getGames(me_db, db).filter(RockPaperScissorsDB.finished == True) \
-        .order_by(RockPaperScissorsDB.last_activity.desc()).limit(limit).all()
+    current_games = Game.getGames(me_db, db).filter(GameDB.finished == False) \
+        .order_by(GameDB.last_activity.desc()).all()
+    finished_games = Game.getGames(me_db, db).filter(GameDB.finished == True) \
+        .order_by(GameDB.last_activity.desc()).limit(limit).all()
 
-    response = [RPS.make_response_from_db(game=game, my_name=me_db.username) for game in
+    response = [Game.make_response_from_db(game=game, my_name=me_db.username) for game in
                 (current_games + finished_games)]
+
     return response
 
 
@@ -244,12 +246,12 @@ async def my_game_from_id(id: int, current_user: UserPydantic = Depends(get_curr
     players = [player.user.username for player in game.players]
     if current_user.username not in players:
         return "that's not your game buddy"
-    response = RPS.make_response_from_db(game=game, my_name=current_user.username)
+    response = Game.make_response_from_db(game=game, my_name=current_user.username)
     return response
 
 
 @app.put("/playRPS/")
-async def playRPS(move_request: RPS.Move_Request,
+async def playRPS(move_request: Game.Move_Request,
                   current_user: UserPydantic = Depends(get_current_user),
                   db: Session = Depends(get_db)):
     if not move_request:
@@ -258,10 +260,10 @@ async def playRPS(move_request: RPS.Move_Request,
             "message": f"something went wrong creating the move request"
         }
     move_request.user_id = get(current_user.username, db).id
-    rps = RPS.commit_move(move_request, db)
+    rps = Game.commit_move(move_request, db)
     if rps:
         await manager.inform_opponent(rps, current_user.username)
-        return RPS.make_response_from_db(game=rps, my_name=current_user.username)
+        return Game.make_response_from_db(game=rps, my_name=current_user.username)
     else:
         return {
             "code": "error",
@@ -271,35 +273,25 @@ async def playRPS(move_request: RPS.Move_Request,
 
 @app.put("/resignRPS/{id}")
 async def resignRPS(id: int, current_user: UserPydantic = Depends(get_current_user), db: Session = Depends(get_db)):
-    rps = RPS.resign(id, current_user.username, db)
+    rps = Game.resign(id, current_user.username, db)
     if rps:
         await manager.inform_opponent(rps, current_user.username)
-        return RPS.make_response_from_db(game=rps, my_name=current_user.username)
+        return Game.make_response_from_db(game=rps, my_name=current_user.username)
     else:
         raise HTTPException(status_code=400, detail="could not resign")
 
 
-@app.post("/createRPS/{opponent}/{goal}")
-async def createRPS(opponent: str, goal: int,
-                    current_user: UserPydantic = Depends(get_current_user),
-                    db: Session = Depends(get_db)):
-    print('new rps ' + current_user.username + ' vs ' + opponent + ', goal ' + str(goal))
-    if current_user.username == opponent:
+@app.post("/create/")
+async def create(request: Game.Game_Request,
+                 current_user: UserPydantic = Depends(get_current_user),
+                 db: Session = Depends(get_db)):
+    print('new game: ' + request.type + ", " + request.player1 + ' vs ' + request.player2)
+    if request.player2 == request.player1:
         raise HTTPException(status_code=400, detail="You cannot create games against yourself")
-    game_request = RPS.Game_Request(player1=current_user.username, player2=opponent, goal=goal)
-    rps = RPS.create_game(game_request, db)
-    if rps:
-        #
-        # print("preparing prod for new game")
-        # for p in rps.players:
-        #     if p.user.username != current_user.username:
-        #         opp = p.user.username
-        #         print("vs opponent: " + opp)
-        # opp_response = RPS.make_response_from_db(game=rps, my_name=opp)
-        # await manager.send_rps(opp_response, opp)
-        #
-        await manager.inform_opponent(rps, current_user.username)
-        return RPS.make_response_from_db(rps, current_user.username)
+    game = Game.create_game(request, db)
+    if game:
+        await manager.inform_opponent(game, current_user.username)
+        return Game.make_response_from_db(game, current_user.username)
     else:
         raise HTTPException(status_code=400, detail="opponent not found, or something else went wrong")
 
