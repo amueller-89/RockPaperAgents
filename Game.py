@@ -1,7 +1,8 @@
+import random
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from models_DB import UserDB, RockPaperScissorsDB, RPS_PlayerDB, GameDB, Slip_PlayerDB, SlipStrikeDB, PlayerDB
@@ -18,6 +19,11 @@ class Game_Request(BaseModel):
 class Move_Request(BaseModel):
     move: int
     user_id: Optional[int]
+    game_id: int
+
+
+class Slip_Request(BaseModel):
+    move: str
     game_id: int
 
 
@@ -85,45 +91,6 @@ def make_response_from_db(game: GameDB, my_name: str):
         return response
 
 
-#  deprecated
-# def make_response_from_db2(game: GameDB, my_name: str):
-#     opponent = ""
-#     opponent_history = "",
-#     my_history = "",
-#     for player in game.players:
-#         if player.user.username != my_name:
-#             opponent = player.user.username
-#             opponent_avatar = player.user.avatar
-#             opponent_history = player.moves
-#             if game.type == "rps":
-#                 opponent_score = player.score
-#                 has_moved_opponent = bool(player.committed_move is not None)
-#         else:
-#             my_avatar = player.user.avatar
-#             my_history = player.moves
-#             if game.type == "rps":
-#                 has_moved_me = bool(player.committed_move is not None)
-#                 my_score = player.score
-#     if game.type == "rps":
-#         goal = game.goal
-#     return RPS_Response(type=game.type,
-#                         id=game.id,
-#                         me=my_name,
-#                         opponent=opponent,
-#                         goal=goal,
-#                         my_score=my_score,
-#                         my_avatar=my_avatar,
-#                         opponent_score=opponent_score,
-#                         opponent_avatar=opponent_avatar,
-#                         my_history=my_history,
-#                         opponent_history=opponent_history,
-#                         has_moved_opponent=has_moved_opponent,
-#                         has_moved_me=has_moved_me,
-#                         date_created=game.date_created,
-#                         last_activity=game.last_activity,
-#                         finished=game.finished)
-
-
 ##### database utilities
 def create_game(request: Game_Request, db: Session):
     if not request:
@@ -139,14 +106,20 @@ def create_game(request: Game_Request, db: Session):
         db.commit()
         player1 = RPS_PlayerDB(user_id=user1.id, game_id=game.id)
         player2 = RPS_PlayerDB(user_id=user2.id, game_id=game.id)
-    if request.type == "slip":
+        db.add(player1)
+        db.add(player2)
+    elif request.type == "slip":
         game = SlipStrikeDB(date_created=datetime.now())
         db.add(game)
         db.commit()
-        player1 = Slip_PlayerDB(user_id=user1.id, game_id=game.id)
-        player2 = Slip_PlayerDB(user_id=user2.id, game_id=game.id)
-    db.add(player1)
-    db.add(player2)
+        player1 = Slip_PlayerDB(user_id=user1.id, game_id=game.id, position=random.randint(0, 4))
+        player2 = Slip_PlayerDB(user_id=user2.id, game_id=game.id, position=random.randint(0, 4))
+        db.add(player1)
+        db.add(player2)
+        db.commit()
+        game.history = f"The game begins with {player1.user.username} on {player1.position}, and {player2.user.username} on {player2.position}.^"
+    else:
+        raise ValidationError
     db.commit()
     return game
 
@@ -164,6 +137,65 @@ def commit_move(move_request: Move_Request, db: Session):
             active_player = player
             break  # TODO check for ill-posed move request?
     active_player.committed_move = move_request.move
+    game.last_activity = datetime.now()
+    db.commit()
+    update(game=game, db=db)
+    return game
+
+
+def commit_move_naive(move: str, who: str, db: Session):
+    game = db.query(SlipStrikeDB).first()
+    for player in game.players:
+        if who == player.user.username:
+            # print(f"{who} is actually {player.user.username}")
+            active = player
+            break
+    # print(move)
+    active.committed_move_slip = move
+    game.last_activity = datetime.now()
+    db.commit()
+    update(game=game, db=db)
+
+
+def commit_slip(request: Slip_Request, who: str, db: Session):
+    moves = {"r", "l", "0", "1", "2", "3", "4"}
+    slips = {"0", "1", "2", "3", "4"}
+    attacks = {"K", "P", "R"}
+    game = db.query(SlipStrikeDB).filter(SlipStrikeDB.id == request.game_id).first()
+    if not game:
+        print("no such game")
+        return None
+    if game.finished:
+        print("game finished")
+        return None
+    active = game.players[0] if game.players[0].user.username == who else game.players[1]
+    p2 = game.players[1] if game.players[0].user.username == who else game.players[0]
+    if active.hit:
+        if len(request.move) != 1 or request.move not in slips:
+            print("hit and not syntactically correct")
+            return None
+        if request.move in active.discarded + active.committed_move_slip + active.cd1 + active.cd2:
+            print("hit and the cards not available")
+            return None
+
+        if attack(p2.position, int(request.move), p2.committed_move_slip[game.state - 1]):
+            print("da schießter hin!")
+            return None
+        print(f"seems legal, putting {request.move} as slip")
+        active.slip = request.move
+    else:
+        if len(request.move) != 2 or request.move[0] == request.move[1]:
+            print("not syntactically correct")
+            return None
+        for c in request.move:
+            if c not in moves | slips | attacks:
+                print("invalid character")
+                return None
+            if c in active.discarded + active.cd1 + active.cd2:
+                print("not available")
+                return None
+        print(f"seems legal, putting {request.move} as move")
+        active.committed_move_slip = request.move
     game.last_activity = datetime.now()
     db.commit()
     update(game=game, db=db)
@@ -189,7 +221,7 @@ def resign(id: int, me: str, db: Session):
 
 
 def update(game: GameDB, db: Session):
-    print(f"updating {game.type}# {game.id},")
+    print(f"updating {game.type} #{game.id},")
     if game.finished:
         return game
     if game.type == "rps":
@@ -202,29 +234,37 @@ def update(game: GameDB, db: Session):
 
 def update_slip(game: SlipStrikeDB):
     if game.state == 0:
+        print("start of the round")
+
         for player in game.players:
             if player.committed_move_slip is None:
                 print(f"{player.user.username} has not committed his move")
                 return game
+        game.history += f"Start of round {game.round}, resolving first card.^"
         for player in game.players:
             player.cd1 = player.cd2
             player.cd2 = ""
         resolve_step(game, game.state)
-        game.state = 1
-        update_slip(game)
+        if not game.finished:
+            game.state = 1
     if game.state == 1:
-        if not resolve_hits():
+        print("resolving 2nd card")
+        if not resolve_hits(game):
             return game
+        game.history += f"Resolving second card.^"
         resolve_step(game, game.state)
-        game.state = 2
-        update_slip()
+        if not game.finished:
+            game.state = 2
     if game.state == 2:
-        if not resolve_hits():
+        print("resolving hits after 2nd card")
+        if not resolve_hits(game):
             return game
+        game.history += f"The round ends with {game.players[0].user.username} on {game.players[0].position} and {game.players[1].user.username} on {game.players[1].position}.^"
         game.state = 0
+        game.round += 1
         for player in game.players:
             player.committed_move_slip = None
-
+    return game
 
 
 def resolve_step(game: SlipStrikeDB, card: int):  # 0 - first card, 1 - 2nd card
@@ -232,26 +272,56 @@ def resolve_step(game: SlipStrikeDB, card: int):  # 0 - first card, 1 - 2nd card
     moves = {"r", "l", "0", "1", "2", "3", "4"}
     slips = {"0", "1", "2", "3", "4"}
     attacks = {"K", "P", "R"}
-    print("locations before movement:")
-    print(p1.position, p2.position)
+    slip_dict = {"K": "knife", "P": "pistol", "R": "rifle"}
+    game.history += f"{p1.user.username} reveals {p1.committed_move_slip[card]}.^"
+    game.history += f"{p2.user.username} reveals {p2.committed_move_slip[card]}.^"
+    # game.history += f"locations before movement: {p1.user.username} on {p1.position}, {p2.user.username} on {p2.position}.^"
     for player in game.players:
         step = player.committed_move_slip[card]
         if step in moves:
             move(player, step)
             if step in slips:
-                player.cd2 += player.step
+                game.history += f"{player.user.username} slips to tile {player.position}"
+                player.cd2 += step
                 print(f"adding {step} to cd2, now: {player.cd2}")
-    print("locations after movement:")
-    print(p1.position, p2.position)
+            else:
+                game.history += f"{player.user.username} steps {'left' if step == 'l' else 'right'} to tile {player.position}.^"
+        else:
+            game.history += f"{player.user.username} remains on {player.position}.^"
     for player in game.players:
         step = player.committed_move_slip[card]
         if step in attacks:
-            if attack(player, p1 if p1 is not player else p2, step):
+            opp = p1 if p1 is not player else p2
+            game.history += f"{player.user.username} tries to hit with {slip_dict[step]}, "
+            if attack(player.position, opp.position, step):
                 print(f"{player.user.username} lands a hit with {step}")
-                p1 if p1 is not player else p2.hit = True
-        player.cd1 += step
+                game.history += f"and he lands a hit!^"
+                # check for gameover
+                print("gameover?")
+                available_slips = ""
+                print("unavailable: " + opp.discarded + opp.committed_move_slip + opp.cd1 + opp.cd2)
+                for s in slips:
+                    if s not in opp.discarded + opp.committed_move_slip + opp.cd1 + opp.cd2:
+                        print(f"available slip: {s}")
+                        if not attack(player.position, int(s), step):
+                            available_slips += s
+                        else:
+                            print("but its attacked!")
+                print("slips actually left: " + available_slips)
 
-
+                if available_slips == "":
+                    print(f"{opp.user.username} cannot evade - {player.user.username} wins!")
+                    game.history += f"{opp.user.username} cannot evade - {player.user.username} wins!^"
+                    game.finished = True
+                    player.won = True
+                    opp.won = False
+                    return game
+                game.history += f"{opp.user.username} may slip to {available_slips}.^"
+                opp.hit = True
+            else:
+                game.history += f"but he misses.^"
+                print(f"{player.user.username} misses with {step}")
+            player.cd1 += step
 
 
 def resolve_hits(game: SlipStrikeDB):
@@ -267,6 +337,7 @@ def resolve_hits(game: SlipStrikeDB):
     for player in game.players:
         if player.hit:
             print(f"{player.user.username} slips to evade, new position {player.slip}")
+            game.history += f"{player.user.username} slips to {player.slip}.^"
             player.hit = None
             player.position = int(player.slip)
             player.discarded += player.slip  # check legality here?
@@ -275,20 +346,20 @@ def resolve_hits(game: SlipStrikeDB):
     # now all hits are resolved
 
 
-def attack(a: Slip_PlayerDB, b: Slip_PlayerDB, weapon: str):
-    if weapon == "K" and a.position == b.position:
+def attack(a: int, b: int, weapon: str):
+    if weapon == "K" and a == b:
         return True
-    if weapon == "P" and a.position in [(b.position - 1) % 5, (b.position + 1) % 5]:
+    if weapon == "P" and a in [(b - 1) % 5, (b + 1) % 5]:
         return True
-    if weapon == "R" and a.position in [(b.position - 2) % 5, (b.position + 2) % 5]:
+    if weapon == "R" and a in [(b - 2) % 5, (b + 2) % 5]:
         return True
     return False
 
 
 def move(player: Slip_PlayerDB, move: str):
-    if player.committed_move[0] == "r":
+    if move == "r":
         player.position = (player.position + 1) % 5
-    if player.committed_move[0] == "l":
+    elif move == "l":
         player.position = (player.position - 1) % 5
     else:
         player.position = int(move)
@@ -300,8 +371,6 @@ def update_rps(game: RockPaperScissorsDB):
             # print("not all moves committed")
             return game
     p1, p2 = game.players[0], game.players[1]
-    # print("p1 " + p1.user.username + ", p2 " + p2.user.username)
-    # print("p1.move " + str(p1.committed_move) + ", p2.move " + str(p2.committed_move))
     move_dict = {0: "rock", 1: "paper", 2: "scissors"}
 
     game.history += f" {p1.user.username} plays {move_dict[p1.committed_move]}, {p2.user.username} plays {move_dict[p2.committed_move]}."

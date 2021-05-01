@@ -37,21 +37,21 @@ def populate(db: Session):
     set_avatar('lucian', alex, db)
     set_avatar('lilia', martha, db)
 
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
-    create_message(message_request=msg, db=db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
-    create_message(message_request=msg, db=db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
-    create_message(message_request=msg, db=db)
-
-    time = str(datetime.now().time())[0:5]
-    msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
-    create_message(message_request=msg, db=db)
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
+    # create_message(message_request=msg, db=db)
+    #
+    # time = str(datetime.now().time())[0:5]
+    # msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
+    # create_message(message_request=msg, db=db)
 
     # print("ids ivan, alex: ", ivan.id, alex.id)
     # # no bidirectionality
@@ -59,26 +59,26 @@ def populate(db: Session):
     # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.sender == ivan)])
     # print("alex received:")
     # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.recipient == alex)])
-
-    for i in range(0, 4):
-        rps_request = Game.Game_Request(player1="alex", player2="ivan", type="rps", goal=2)
-        Game.create_game(rps_request, db)
-
-    for i in range(0, 10):
-        # filter for unfinished games with ivan in them
-        ivan_games = Game.getGames(ivan, db)
-        ivan_games = ivan_games.filter(RockPaperScissorsDB.finished == False)
-        # sort by date created, oldest first
-        ivan_games = ivan_games.order_by(RockPaperScissorsDB.date_created)
-        game = ivan_games.first()
-        print("ivan's oldest unfinished is #", game.id)
-
-        # commit a random move for both of us, to a random game
-        game = ivan_games.all()[random.randint(0, len(ivan_games.all()) - 1)]
-        move_request = Game.Move_Request(move=random.randint(0, 2), user_id=ivan.id, game_id=game.id)
-        Game.commit_move(move_request, db)
-        move_request = Game.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
-        Game.commit_move(move_request, db)
+    #
+    # for i in range(0, 4):
+    #     rps_request = Game.Game_Request(player1="alex", player2="ivan", type="rps", goal=2)
+    #     Game.create_game(rps_request, db)
+    #
+    # for i in range(0, 10):
+    #     # filter for unfinished games with ivan in them
+    #     ivan_games = Game.getGames(ivan, db)
+    #     ivan_games = ivan_games.filter(RockPaperScissorsDB.finished == False)
+    #     # sort by date created, oldest first
+    #     ivan_games = ivan_games.order_by(RockPaperScissorsDB.date_created)
+    #     game = ivan_games.first()
+    #     print("ivan's oldest unfinished is #", game.id)
+    #
+    #     # commit a random move for both of us, to a random game
+    #     game = ivan_games.all()[random.randint(0, len(ivan_games.all()) - 1)]
+    #     move_request = Game.Move_Request(move=random.randint(0, 2), user_id=ivan.id, game_id=game.id)
+    #     Game.commit_move(move_request, db)
+    #     move_request = Game.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
+    #     Game.commit_move(move_request, db)
 
     chat = ["Hallo wer will spielen?", "ja ich bitte", "slipstrike oder rps?",
             "mega bock auf scheresteinpapier, bis 7?", "ja lets go"]

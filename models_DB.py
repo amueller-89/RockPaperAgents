@@ -1,3 +1,5 @@
+import random
+
 from sqlalchemy import Table, Column, String, Boolean, Integer, ForeignKey, DateTime, Enum
 from sqlalchemy.orm import relationship
 
@@ -44,7 +46,8 @@ class RockPaperScissorsDB(GameDB):
 
 
 class SlipStrikeDB(GameDB):
-    state = Column(Integer)  # None - between rounds, 1 - after exectuting first card, 2 - after executing 2nd card
+    state = Column(Integer, default=0)  # None - between rounds, 1 - after exectuting first card, 2 - after executing 2nd card
+    round = Column(Integer, default=1)
     __mapper_args__ = {
         'polymorphic_identity': 'slip'
     }
@@ -77,8 +80,8 @@ class Slip_PlayerDB(PlayerDB):
     discarded = Column(String, default="")
     hit = Column(Boolean)
     slip = Column(String)
-    cd1 = Column(String)
-    cd2 = Column(String)
+    cd1 = Column(String, default="")
+    cd2 = Column(String, default="")
 
     __mapper_args__ = {
         'polymorphic_identity': 'slip_player'

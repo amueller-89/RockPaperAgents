@@ -16,6 +16,7 @@
 
     let rps_move = -1
     let rps_id
+    let slip_id
 
     initialize()
 
@@ -169,8 +170,8 @@
                         + game["opponent"] + check + '</div></div></div>'
                 }
                 if (game.type == "slip") {
-                    btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui teal label"> Slip </a><div class="ui basic ' + border
-                        + ' icon button">#' + game.id + ' vs. ' + game["opponent"] + check + '</div></div></div>'
+                    btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui teal label" onclick="showSlip(' + game["id"] + ')"> Slip </a><div class="ui basic ' + border
+                        + ' icon button" onclick="showSlip(' + game["id"] + ')">#' + game.id + ' vs. ' + game["opponent"] + check + '</div></div></div>'
                 }
                 current_games_list.innerHTML += btnHTML
             }
@@ -248,6 +249,36 @@
         })
     }
 
+    function play_slip() {
+        const move = document.getElementById("input-slip-move").value
+        console.log("slip, playing" + move)
+        const token = window.localStorage.getItem("RPAtoken")
+        const play = $.ajax({
+            url: "/playSlipStrike/",
+            type: "put",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('Authorization', "Bearer " + token);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({"game_id": slip_id, "move": move}),
+            dataType: 'json',
+            success: function () {
+                console.log("success committing move, response:")
+                console.log(play.responseJSON)
+                let game = play.responseJSON
+                fetchedGames[game.id] = game
+                configure_slip_view(game.id)
+                //get_rps(rps_id)
+                drawMyCurrentGames()
+                drawMyFinishedGames()
+            },
+            error: function () {
+                //  general error handling ala oops something went wrong
+                console.log(play.responseJSON)
+            }
+        });
+    }
+
     function play_rps() {
         console.log("playing " + rps_move + " in game#" + rps_id)
         const token = window.localStorage.getItem("RPAtoken")
@@ -300,7 +331,7 @@
             url: "/create/",
             type: "POST",
             contentType: 'application/json',
-            data: JSON.stringify({"type": "rps", "player1":username, "player2": opponent, "goal": goal}),
+            data: JSON.stringify({"type": "rps", "player1": username, "player2": opponent, "goal": goal}),
             dataType: 'json',
             beforeSend: function (xhr) {
                 xhr.setRequestHeader('Authorization', "Bearer " + token);
@@ -351,6 +382,23 @@
 
     }
 
+    function configure_slip_view(id) {
+        document.getElementById("slip-content").innerHTML = ""
+        let game = fetchedGames[id]
+        let history = game.history.split("^")
+        for (line in history) {
+            document.getElementById("slip-content").innerHTML += history[line] + "<br>"
+        }
+
+
+        document.getElementById("slip-info").innerHTML = "SlipStrike game #" + game.id
+
+        if (game.last_activity) {
+            document.getElementById("slip-info").innerHTML += "<br>last active: " + dateConvert(game.last_activity)
+        }
+        document.getElementById("slip-info").innerHTML += "<br>created: " + dateConvert(game.date_created)
+    }
+
     // from prefetched data!
     function configure_rps_view(id) {
         //cleanup
@@ -368,13 +416,14 @@
             document.getElementById("rps-resign-div").style.display = "none"
             if (game.won == true) {
                 document.getElementById("rps-finished").innerHTML = '<img src="games/victory" alt="" width="300" height="auto">'
-                if(game.my_score < game.goal){
+                if (game.my_score < game.goal) {
                     document.getElementById("rps-finished").innerHTML += "opponent resigned!"
-                 }
+                }
             } else {
                 document.getElementById("rps-finished").innerHTML = '<img src="games/defeat" alt="" width="350" height="auto">'
-                if(game.opponent_score < game.goal){
-                    document.getElementById("rps-finished").innerHTML += "You resigned!"}
+                if (game.opponent_score < game.goal) {
+                    document.getElementById("rps-finished").innerHTML += "You resigned!"
+                }
             }
             document.getElementById("rps-finished").style.display = "block"
             document.getElementById("rps-grid").style.display = "none"
@@ -429,6 +478,7 @@
             scoreHTML += game["my_score"] + " - " + game["opponent_score"] + "<br>first to " + game.goal
         }
         document.getElementById("rps-score").innerHTML += scoreHTML
+
         document.getElementById("rps-info").innerHTML = "RPS game #" + game.id
 
         if (game.last_activity) {
@@ -443,6 +493,15 @@
         console.log("show rps# " + id)
         configure_rps_view(id)
         $('#modal-RPS').modal({
+            autofocus: false
+        }).modal('show')
+    }
+
+    function showSlip(id) {
+        slip_id = id
+        console.log("show slip# " + id)
+        configure_slip_view(id)
+        $('#modal-slip').modal({
             autofocus: false
         }).modal('show')
     }
@@ -690,6 +749,11 @@
                 sendChat()
             }
         })
+        document.getElementById("input-slip-move").addEventListener("keyup", function (event) {
+            if (event.keyCode === 13) {
+                play_slip()
+            }
+        })
     })
 
 </script>
@@ -888,6 +952,49 @@
     </div>
 </div>
 
+<div id="modal-slip" class="ui modal">
+    <i class="close icon"></i>
+    <div class="header">
+        <div class="ui grid">
+            <div class="three wide column" id="slip-me">
+                me
+            </div>
+
+            <div class="center aligned ten wide column">
+            </div>
+
+            <div class="right aligned three wide column" id="slip-opponent">
+                him
+            </div>
+        </div>
+    </div>
+    <div class="scrolling content" id="slip-content">
+    </div>
+    <div class="actions">
+        <div class="ui three columns grid">
+            <div class="left aligned column">
+                <div class="ui input" id="div-slip-move">
+                    <input type="text" id="input-slip-move" placeholder="What do?">
+                </div>
+            </div>
+            <div class="column">
+                <div id="slip-resign-div">
+                    <button class="ui black button" onclick="">
+                        resign
+                    </button>
+                    <div class="ui checkbox">
+                        <input type="checkbox" id="checkbox-slip-resign" tabindex="0">
+                        <label>Yes, I'm sure</a></label>
+                    </div>
+                </div>
+
+            </div>
+            <div class="ui right aligned column">
+                <text style="font-size: smaller; color: grey" id="slip-info"></text>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div id="modal-RPS" class="ui modal">
     <i class="close icon"></i>

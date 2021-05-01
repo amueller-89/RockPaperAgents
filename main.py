@@ -250,6 +250,21 @@ async def my_game_from_id(id: int, current_user: UserPydantic = Depends(get_curr
     return response
 
 
+@app.put("/playSlipStrike")
+async def play_slip(request: Game.Slip_Request, current_user: UserPydantic = Depends(get_current_user),
+               db: Session = Depends(get_db)):
+    if not request:
+        return {
+            "code": "error",
+            "message": f"something went wrong creating the move request"
+        }
+    slip = Game.commit_slip(request, current_user.username, db)
+    if slip:
+        return Game.make_response_from_db(game=slip, my_name=current_user.username)
+    else:
+        raise HTTPException(status_code=400, detail="illegal move")
+
+
 @app.put("/playRPS/")
 async def playRPS(move_request: Game.Move_Request,
                   current_user: UserPydantic = Depends(get_current_user),
