@@ -17,6 +17,7 @@
     let rps_move = -1
     let rps_id
     let slip_id
+    let gametype
 
     initialize()
 
@@ -104,8 +105,8 @@
         document.getElementById("btn-newmessage").classList.add("disabled")
         document.getElementById("name").value = ""
         document.getElementById("password").value = ""
-        document.getElementById("field-rps-opp").classList.remove('error')
-        document.getElementById("input-rps-opp").value = ""
+        document.getElementById("field-opp").classList.remove('error')
+        document.getElementById("input-opp").value = ""
         document.getElementById("input-rps-message").value = ""
         document.getElementById("field-recipient").classList.remove('error')
         document.getElementById("input-recipient").value = ""
@@ -198,6 +199,12 @@
                         + game["opponent"]
                         + '</div></div></div>'
                 }
+                if (game.type == "slip") {
+                    btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui teal label" onclick="showSlip(' + game["id"] + ')">Slip'
+                         +'</a><div class="ui basic ' + border + ' icon button" onclick="showSlip(' + game["id"] + ')">#' + game.id + ' vs. '
+                        + game["opponent"]
+                        + '</div></div></div>'
+                }
                 finished_games_list.innerHTML += btnHTML
             }
         }
@@ -263,17 +270,18 @@
             data: JSON.stringify({"game_id": slip_id, "move": move}),
             dataType: 'json',
             success: function () {
+                document.getElementById("input-slip-move").value = ""
+                document.getElementById("div-slip-move").classList.remove("error")
                 console.log("success committing move, response:")
                 console.log(play.responseJSON)
                 let game = play.responseJSON
                 fetchedGames[game.id] = game
                 configure_slip_view(game.id)
-                //get_rps(rps_id)
                 drawMyCurrentGames()
                 drawMyFinishedGames()
             },
             error: function () {
-                //  general error handling ala oops something went wrong
+                document.getElementById("div-slip-move").classList.add("error")
                 console.log(play.responseJSON)
             }
         });
@@ -314,13 +322,22 @@
     function create(game) {
         console.log("create ", game)
         if (game == "Rock Paper Scissors") {
-            $('#modal-newrps').modal('show')
+            gametype = "rps"
+            //document.getElementById("rps-new-dropdown").style.display = ""
+            document.getElementById("btn-creategame").classList.remove("teal")
+            document.getElementById("btn-creategame").classList.add("blue")
         }
+        if (game == "Slip Strike"){
+            gametype = "slip"
+            document.getElementById("btn-creategame").classList.remove("blue")
+            document.getElementById("btn-creategame").classList.add("teal")
+        }
+        $('#modal-newgame').modal('show')
     }
 
 
-    function createRPS() {
-        const opponent = document.getElementById("input-rps-opp").value
+    function createGame() {
+        const opponent = document.getElementById("input-opp").value
         let goal = $('#rps-new-dropdown').dropdown('get value');
         if (!goal) {
             goal = 3
@@ -331,14 +348,14 @@
             url: "/create/",
             type: "POST",
             contentType: 'application/json',
-            data: JSON.stringify({"type": "rps", "player1": username, "player2": opponent, "goal": goal}),
+            data: JSON.stringify({"type": gametype, "player1": username, "player2": opponent, "goal": goal}),
             dataType: 'json',
             beforeSend: function (xhr) {
                 xhr.setRequestHeader('Authorization', "Bearer " + token);
             },
             success: function () {
-                console.log("created new rps vs " + opponent + ", goal: " + goal)
-                document.getElementById("field-rps-opp").classList.remove('error')
+                console.log("created new "+gametype+" vs " + opponent + ", goal: " + goal)
+                document.getElementById("field-opp").classList.remove('error')
                 const message = document.getElementById("input-rps-message").value
                 console.log("tryna send from creation")
                 console.log(message)
@@ -361,7 +378,7 @@
                     }
                 });
 
-                document.getElementById("input-rps-opp").value = ""
+                document.getElementById("input-opp").value = ""
                 document.getElementById("input-rps-message").value = ""
                 $('#rps-new-dropdown').dropdown('get value')
                 let game = createRPS.responseJSON
@@ -369,13 +386,13 @@
                 drawMyCurrentGames()
                 drawMyFinishedGames()
                 //getMyGames()
-                $('#modal-newrps').modal('hide').modal('hide dimmer');
+                $('#modal-newgame').modal('hide').modal('hide dimmer');
 
             },
             error: function () {
                 //  general error handling ala oops something went wrong
                 console.log(createRPS.responseJSON)
-                document.getElementById("field-rps-opp").classList.add('error')
+                document.getElementById("field-opp").classList.add('error')
                 //document.getElementById("input-recipient").setAttribute("data-content", "popup")
             }
         });
@@ -383,11 +400,11 @@
     }
 
     function configure_slip_view(id) {
-        document.getElementById("slip-content").innerHTML = ""
+       document.getElementById("slip-content").innerHTML = ""
         let game = fetchedGames[id]
         let history = game.history.split("^")
         for (line in history) {
-            document.getElementById("slip-content").innerHTML += history[line] + "<br>"
+           document.getElementById("slip-content").innerHTML += history[line] + "<br>"
         }
 
 
@@ -493,7 +510,8 @@
         console.log("show rps# " + id)
         configure_rps_view(id)
         $('#modal-RPS').modal({
-            autofocus: false
+            autofocus: false,
+            closable: false
         }).modal('show')
     }
 
@@ -502,7 +520,8 @@
         console.log("show slip# " + id)
         configure_slip_view(id)
         $('#modal-slip').modal({
-            autofocus: false
+            autofocus: false,
+            closable: false
         }).modal('show')
     }
 
@@ -744,6 +763,8 @@
         $('.ui.dropdown')
             .dropdown()
         ;
+
+
         document.getElementById("input-chat").addEventListener("keyup", function (event) {
             if (event.keyCode === 13) {
                 sendChat()
@@ -916,13 +937,13 @@
 </div>
 
 
-<div id="modal-newrps" class="ui tiny modal">
+<div id="modal-newgame" class="ui tiny modal">
     <i class="close icon"></i>
     <div class="header">Choose opponent</div>
     <div class="content">
         <form class="ui form">
-            <div class="field" id="field-rps-opp">
-                <input type="text" id="input-rps-opp" placeholder="Opponent">
+            <div class="field" id="field-opp">
+                <input type="text" id="input-opp" placeholder="Opponent">
             </div>
             <div class="field">
                 <textarea rows="4" placeholder="attach a message to your challenge!" id="input-rps-message"></textarea>
@@ -945,14 +966,14 @@
                 <div class="item">9</div>
             </div>
         </div>
-        <button class="ui labeled icon primary button" id="btn-rps-send" onclick="createRPS()">
+        <button class="ui labeled icon button" id="btn-creategame" onclick="createGame()">
             <i class="paper plane outline icon"></i>
             post challenge
         </button>
     </div>
 </div>
 
-<div id="modal-slip" class="ui modal">
+<div id="modal-slip" class="ui modal" data-backdrop="static">
     <i class="close icon"></i>
     <div class="header">
         <div class="ui grid">
@@ -969,12 +990,16 @@
         </div>
     </div>
     <div class="scrolling content" id="slip-content">
+
     </div>
     <div class="actions">
         <div class="ui three columns grid">
             <div class="left aligned column">
                 <div class="ui input" id="div-slip-move">
-                    <input type="text" id="input-slip-move" placeholder="What do?">
+                    <input type="text" id="input-slip-move" placeholder="What do?" autocomplete="off">
+                    <button class="ui teal icon button" onclick="play_slip()"><i class="play icon"></i>
+            </button>
+                    </button>
                 </div>
             </div>
             <div class="column">
