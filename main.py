@@ -26,8 +26,8 @@ templates = Jinja2Templates(directory="templates")
 
 models_DB.Base.metadata.create_all(bind=engine)
 
-games = [["Rock Paper Scissors", "blue", True], ["Slip Strike", "teal", True],
-         ["Indonesian Finger Game", "brown", False], ["Draft Diff", "olive", False]]
+games = [["Rock Paper Scissors", "blue", True, "The classic - Paper beats Rock. Scissors beats Paper. But Rock beats Scissors!"], ["Slip Strike", "teal", True, "Teleporting secret agents, each vying to be a step ahead"],
+         ["Indonesian Finger Game", "brown", False, "forthcoming"], ["Draft Diff", "olive", False, "forthcoming"]]
 
 games2 = [GameType(name=game[0], color=game[1], active=game[2]) for game in games]
 

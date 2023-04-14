@@ -35,7 +35,7 @@
                         gameColors.push(games[i][1])
                     }
                     var btnHTML = '<div class="item"><button id="btn-' + x + '" class="ui ' + games[i][1]
-                        + ' disabled button" style="opacity: 1;" data-tooltip="The classic - Paper beats Rock. Scissors beats Paper. But Rock beats Scissors!" onclick="create(\'' + x + '\')">' + x
+                        + ' disabled button" style="opacity: 1;" data-tooltip=" '+games[i][3]+'" onclick="create(\'' + x + '\')">' + x
                         + '</button></div>'
                     games_list.innerHTML += btnHTML
                 }
@@ -1009,7 +1009,7 @@
                     </button>
                     <div class="ui checkbox">
                         <input type="checkbox" id="checkbox-slip-resign" tabindex="0">
-                        <label>Yes, I'm sure</a></label>
+                        <label>Yes, I'm sure</label>
                     </div>
                 </div>
 
@@ -1103,7 +1103,7 @@
                     </button>
                     <div class="ui checkbox">
                         <input type="checkbox" id="checkbox-rps-resign" tabindex="0">
-                        <label>Yes, I'm sure</a></label>
+                        <label>Yes, I'm sure</label>
                     </div>
                 </div>
             </div>
@@ -1192,7 +1192,7 @@
             </button>
             <div class="ui checkbox" id="div-resign-checkbox">
                 <input type="checkbox" tabindex="0" id="input-resign">
-                <label id="text-resign">Yes, I'm sure</a></label>
+                <label id="text-resign">Yes, I'm sure</label>
             </div>
         </div>
     </div>
