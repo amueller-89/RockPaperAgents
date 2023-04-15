@@ -1,4 +1,4 @@
-from typing import Optional
+# from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
@@ -34,7 +34,7 @@ games2 = [GameType(name=game[0], color=game[1], active=game[2]) for game in game
 
 ######## HTML endpoints
 
-# SPA babyyyy
+# SPA baby
 @app.get("/")
 def home(request: Request):
     return templates.TemplateResponse("SPA-dashboard.html", {"request": request})
