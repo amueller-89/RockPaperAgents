@@ -30,7 +30,7 @@
                 let games_list = document.getElementById("list-games");
                 for (var i = 0; i < games.length; i++) {
                     const x = games[i][0]
-                    if (games[i][2] == true) {
+                    if (games[i][2] === true) {
                         gameCreateButtons.push(x)
                         gameColors.push(games[i][1])
                     }
@@ -128,19 +128,19 @@
             console.log("websocket received:")
             let json = JSON.parse(JSON.parse(event.data))
             console.log(json)
-            if (json.type == "rps") {  // check wether games an incoming rps instance
+            if (json.type === "rps") {  // check wether games an incoming rps instance
                 fetchedGames[json.id] = json
-                if (rps_id == json.id) {
+                if (rps_id === json.id) {
                     configure_rps_view(rps_id)
                 }
                 drawMyCurrentGames()
                 drawMyFinishedGames()
             }
-            if (json.type == "message") {
+            if (json.type === "message") {
                 fetchedMessages.splice(0, 0, json)
                 drawMyRecentMessages()
             }
-            if (json.type == "chat") {
+            if (json.type === "chat") {
                 console.log("external chat update")
                 fetchedChat.splice(0, 0, json)
                 drawChatMessages()
@@ -165,12 +165,12 @@
                     border = "black"
                 }
                 let btnHTML = ""
-                if (game.type == "rps") {
+                if (game.type === "rps") {
                     btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
                         + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
                         + game["opponent"] + check + '</div></div></div>'
                 }
-                if (game.type == "slip") {
+                if (game.type === "slip") {
                     btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui teal label" onclick="showSlip(' + game["id"] + ')"> Slip </a><div class="ui basic ' + border
                         + ' icon button" onclick="showSlip(' + game["id"] + ')">#' + game.id + ' vs. ' + game["opponent"] + check + '</div></div></div>'
                 }
@@ -193,13 +193,13 @@
                     border += "red"
                 }
                 let btnHTML = ""
-                if (game.type == "rps") {
+                if (game.type === "rps") {
                     btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui blue label" onclick="showRPS(' + game["id"] + ')">'
                         + game["my_score"] + ' - ' + game["opponent_score"] + '</a><div class="ui basic ' + border + ' icon button" onclick="showRPS(' + game["id"] + ')">#' + game.id + ' vs. '
                         + game["opponent"]
                         + '</div></div></div>'
                 }
-                if (game.type == "slip") {
+                if (game.type === "slip") {
                     btnHTML = '<div class="item"><div class="ui left labeled button"><a class="ui teal label" onclick="showSlip(' + game["id"] + ')">Slip'
                          +'</a><div class="ui basic ' + border + ' icon button" onclick="showSlip(' + game["id"] + ')">#' + game.id + ' vs. '
                         + game["opponent"]
@@ -321,13 +321,13 @@
 
     function create(game) {
         console.log("create ", game)
-        if (game == "Rock Paper Scissors") {
+        if (game === "Rock Paper Scissors") {
             gametype = "rps"
             //document.getElementById("rps-new-dropdown").style.display = ""
             document.getElementById("btn-creategame").classList.remove("teal")
             document.getElementById("btn-creategame").classList.add("blue")
         }
-        if (game == "Slip Strike"){
+        if (game === "Slip Strike"){
             gametype = "slip"
             document.getElementById("btn-creategame").classList.remove("blue")
             document.getElementById("btn-creategame").classList.add("teal")
@@ -431,7 +431,7 @@
         let game = fetchedGames[id]
         if (game.finished) {
             document.getElementById("rps-resign-div").style.display = "none"
-            if (game.won == true) {
+            if (game.won === true) {
                 document.getElementById("rps-finished").innerHTML = '<img src="games/victory" alt="" width="300" height="auto">'
                 if (game.my_score < game.goal) {
                     document.getElementById("rps-finished").innerHTML += "opponent resigned!"
@@ -483,7 +483,7 @@
                     scoreHTML += '<button class="ui circular huge green icon button"> </button>'
                 } else if (i >= 2 * game["goal"] - game["opponent_score"] - 1) {
                     scoreHTML += '<button class="ui circular huge red icon button"> </button>'
-                } else if (i == game["goal"] - 1) {
+                } else if (i === game["goal"] - 1) {
                     scoreHTML += '<button class="ui circular huge black basic icon button"> <i class="icon trophy"></i>' +
                         '</button>'
                 } else {
@@ -670,11 +670,12 @@
     }
 
     function sendChat() {
-        console.log("sending chat?")
-        message = document.getElementById("input-chat").value
+
+        const message = document.getElementById("input-chat").value
         document.getElementById("input-chat").value = ""
-        if (message != "") {
+        if (message !== "") {
             const token = window.localStorage.getItem("RPAtoken")
+            console.log("sending chat message: " + message)
             const send = $.ajax({
                 url: "/chat",
                 type: "POST",
@@ -682,6 +683,9 @@
                     xhr.setRequestHeader('Authorization', "Bearer " + token);
                 },
                 data: JSON.stringify({"message": message}),
+                headers: {
+                    "Content-type": "application/json"
+                },
                 success: function () {
                     console.log("chat sent successfully")
                     console.log(send.responseJSON)
@@ -720,7 +724,7 @@
             },
             error: function () {
                 //  general error handling ala oops something went wrong
-                console.log(send.responseJSON)
+                console.log("send error response" + send.responseJSON)
                 if (!loggedIn) {
                     // TODO tell the user
                 }
