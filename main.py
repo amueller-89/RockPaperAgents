@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 import Game
-from Game import Game_Request
+# from Game import Game_Request
 from utilities import ACCESS_TOKEN_EXPIRE_MINUTES, get_db, create_access_token, get_current_user, get
 from utilities import populate, verify_password, make_message_response_from_db
 from utilities import create_message, create_chat_message, set_avatar, create_user, ConnectionManager
@@ -26,8 +26,8 @@ templates = Jinja2Templates(directory="templates")
 
 models_DB.Base.metadata.create_all(bind=engine)
 
-games = [["Rock Paper Scissors", "blue", True, "The classic - Paper beats Rock. Scissors beats Paper. But Rock beats Scissors!"], ["Slip Strike", "teal", True, "Teleporting secret agents, each vying to be a step ahead"],
-         ["Indonesian Finger Game", "brown", False, "forthcoming"], ["Draft Diff", "olive", False, "forthcoming"]]
+games = [["Rock Paper Scissors", "blue", True, "The classic - Paper beats Rock. Scissors beats Paper. But Rock beats Scissors!"], ["Slip Strike", "teal", False, "Teleporting secret agents, each vying to be a step ahead"],
+         ["Indonesian Finger Game", "brown", False, "forthcoming"]]
 
 games2 = [GameType(name=game[0], color=game[1], active=game[2]) for game in games]
 
@@ -49,6 +49,7 @@ def terms(request: Request):
 #### websocket endpoint
 @app.websocket("/ws/{username}")
 async def websocket(ws: WebSocket, username: str):
+    print("websocket " + username)
     await manager.connect(ws, username)
     print('currently online')
     print(manager.connections())

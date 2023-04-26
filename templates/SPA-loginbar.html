@@ -306,7 +306,7 @@
                                             "Content-type": "application/json"
                                         },
                                         success: function () {
-                                            console.log("successful registration") //TODO better feedback, at some point even send email with registration confirmation and password.
+                                            console.log("successful registration") 
                                             console.log("getting token for" + name + ", " + password)
                                             const response = $.ajax({
                                                 url: "/token",

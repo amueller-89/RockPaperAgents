@@ -18,67 +18,24 @@ from models_DB import UserDB, MessageDB, RockPaperScissorsDB
 
 # populates the database with a bunch of user accounts and messages, RPS games and moves
 def populate(db: Session):
-    alex = RegisterRequest(username="alex", email="alex@example.com", password="geheim")
+    alex = RegisterRequest(username="alex", email="alex@example.com", password="alex")
     create_user(register_request=alex, db=db)
 
-    martha = RegisterRequest(username="martha", email="martha@example.com", password="secret")
-    create_user(register_request=martha, db=db)
+    clara = RegisterRequest(username="CoolCatClara", email="clara@example.com", password="clara")
+    create_user(register_request=clara, db=db)
 
-    ivan = RegisterRequest(username="ivan", email="ivan@example.com", password="juri")
-    create_user(register_request=ivan, db=db)
+    linos = RegisterRequest(username="LinosSup!", email="linos@example.com", password="linos")
+    create_user(register_request=linos, db=db)
 
     asd = RegisterRequest(username="asd", email="asd@example.com", password="asd")
     create_user(register_request=asd, db=db)
 
-    ivan = db.query(UserDB).filter(UserDB.username == "ivan").one_or_none()
+    linos = db.query(UserDB).filter(UserDB.username == "CoolCatClara").one_or_none()
     alex = db.query(UserDB).filter(UserDB.username == "alex").one_or_none()
-    martha = db.query(UserDB).filter(UserDB.username == "martha").one_or_none()
-    set_avatar('zac', ivan, db)
+    clara = db.query(UserDB).filter(UserDB.username == "CoolCatClara").one_or_none()
+    set_avatar('zac', linos, db)
     set_avatar('lucian', alex, db)
-    set_avatar('lilia', martha, db)
-
-    # time = str(datetime.now().time())[0:5]
-    # msg = MessageRequest(sender_id=ivan.id, content="Hallo um, " + time, recipient_id=alex.id)
-    # create_message(message_request=msg, db=db)
-    #
-    # time = str(datetime.now().time())[0:5]
-    # msg = MessageRequest(sender_id=martha.id, content="Hiiii um, " + time, recipient_id=alex.id)
-    # create_message(message_request=msg, db=db)
-    #
-    # time = str(datetime.now().time())[0:5]
-    # msg = MessageRequest(sender_id=alex.id, content="brooo, um " + time, recipient_id=ivan.id)
-    # create_message(message_request=msg, db=db)
-    #
-    # time = str(datetime.now().time())[0:5]
-    # msg = MessageRequest(sender_id=martha.id, content="juri wird so cuuuute, um " + time, recipient_id=ivan.id)
-    # create_message(message_request=msg, db=db)
-
-    # print("ids ivan, alex: ", ivan.id, alex.id)
-    # # no bidirectionality
-    # print("ivan sent:")
-    # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.sender == ivan)])
-    # print("alex received:")
-    # print([msg.content for msg in db.query(MessageDB).filter(MessageDB.recipient == alex)])
-    #
-    # for i in range(0, 4):
-    #     rps_request = Game.Game_Request(player1="alex", player2="ivan", type="rps", goal=2)
-    #     Game.create_game(rps_request, db)
-    #
-    # for i in range(0, 10):
-    #     # filter for unfinished games with ivan in them
-    #     ivan_games = Game.getGames(ivan, db)
-    #     ivan_games = ivan_games.filter(RockPaperScissorsDB.finished == False)
-    #     # sort by date created, oldest first
-    #     ivan_games = ivan_games.order_by(RockPaperScissorsDB.date_created)
-    #     game = ivan_games.first()
-    #     print("ivan's oldest unfinished is #", game.id)
-    #
-    #     # commit a random move for both of us, to a random game
-    #     game = ivan_games.all()[random.randint(0, len(ivan_games.all()) - 1)]
-    #     move_request = Game.Move_Request(move=random.randint(0, 2), user_id=ivan.id, game_id=game.id)
-    #     Game.commit_move(move_request, db)
-    #     move_request = Game.Move_Request(move=random.randint(0, 2), user_id=alex.id, game_id=game.id)
-    #     Game.commit_move(move_request, db)
+    set_avatar('lilia', clara, db)
 
     chat = ["Hallo wer will spielen?", "ja ich bitte", "slipstrike oder rps?",
             "mega bock auf scheresteinpapier, bis 7?", "ja lets go"]
@@ -86,12 +43,12 @@ def populate(db: Session):
     for m in chat:
         print(f"creating chat message {i}")
         create_chat_message(
-            MessageRequest(sender_id=alex.id if i % 2 == 0 else ivan.id, content=m, date=datetime.now()), db)
+            MessageRequest(sender_id=alex.id if i % 2 == 0 else clara.id, content=m, date=datetime.now()), db)
         i += 1
         sleep(.5)
 
-    slip_request = Game.Game_Request(player1="alex", player2="ivan", type="slip")
-    Game.create_game(slip_request, db)
+    rps_request = Game.Game_Request(player1="alex", player2="CoolCatClara", type="rps", goal= 7)
+    Game.create_game(rps_request, db)
 
 
 class ConnectionManager:
